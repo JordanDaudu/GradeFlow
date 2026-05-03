@@ -2,6 +2,21 @@ export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // 50 MB
 
 export const ALLOWED_UPLOAD_ACCEPT = [".pdf", "application/pdf"].join(",");
 
+const DANGEROUS_FILE_EXTENSIONS = [
+  "exe",
+  "bat",
+  "sh",
+  "cmd",
+  "msi",
+  "ps1",
+  "scr",
+] as const;
+
+const DANGEROUS_EXT_PATTERN = new RegExp(
+  `\\.(?:${DANGEROUS_FILE_EXTENSIONS.join("|")})$`,
+  "i",
+);
+
 // `docx` (Office Open XML) renders inline because the API converts it to HTML
 // on the fly. `doc` (legacy binary Word) cannot be rendered inline and falls
 // back to the download badge.

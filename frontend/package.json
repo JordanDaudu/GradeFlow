@@ -78,6 +78,7 @@
     "zod": "catalog:"
   },
   "dependencies": {
-    "pdfjs-dist": "^5.7.284"
+    "pdfjs-dist": "^5.7.284",
+    "workbox-window": "^7.4.0"
   }
 }

@@ -14,8 +14,8 @@ import {
   UserCog,
   Menu,
 } from "lucide-react";
-import jdLogoLight from "@assets/JD_logo_1777797796775.png";
-import jdLogoDark from "@assets/JD_logo_Dark_Mode_1777797796774.png";
+const jdLogoLight = "/jd-logo-light.png";
+const jdLogoDark = "/jd-logo-dark.png";
 import { useGetCurrentUser, useLogout, getGetCurrentUserQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";

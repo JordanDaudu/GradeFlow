@@ -6,7 +6,7 @@
     "dev": "export NODE_ENV=development && pnpm run prisma:generate && pnpm run prisma:deploy && nest start --watch --preserveWatchOutput",
     "build": "pnpm run prisma:generate && nest build",
     "start": "node --enable-source-maps ./dist/main.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "pnpm run prisma:generate && tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "prisma:generate": "prisma generate",
     "prisma:deploy": "prisma migrate deploy",

@@ -21,8 +21,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useTheme } from "@/lib/use-theme";
-import jdLogoLight from "@assets/JD_logo_1777797796775.png";
-import jdLogoDark from "@assets/JD_logo_Dark_Mode_1777797796774.png";
+const jdLogoLight = "/jd-logo-light.png";
+const jdLogoDark = "/jd-logo-dark.png";
 
 const loginSchema = z.object({
   email: z.string().email("כתובת אימייל לא חוקית"),

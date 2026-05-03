@@ -208,7 +208,7 @@ function PdfPage({
       const ctx = canvas.getContext("2d");
       if (!ctx || cancelled) return;
       ctx.scale(dpr, dpr);
-      renderTask = p.render({ canvasContext: ctx, viewport });
+      renderTask = p.render({ canvas, canvasContext: ctx, viewport });
       renderTask.promise.catch(() => {});
     });
 

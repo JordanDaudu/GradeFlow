@@ -28,4 +28,16 @@ else
 fi
 
 echo "[entrypoint] Starting application..."
-exec node --enable-source-maps dist/main.js
+if [ -f dist/main.js ]; then
+  APP_ENTRY="dist/main.js"
+elif [ -f dist/src/main.js ]; then
+  APP_ENTRY="dist/src/main.js"
+else
+  echo "[entrypoint] Could not find compiled NestJS entrypoint."
+  echo "[entrypoint] Available dist files:"
+  find dist -maxdepth 5 -type f | sort || true
+  exit 1
+fi
+
+echo "[entrypoint] Using entrypoint: $APP_ENTRY"
+exec node --enable-source-maps "$APP_ENTRY"
