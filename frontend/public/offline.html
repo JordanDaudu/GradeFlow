@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>אין חיבור — GradeFlow</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --fg: #0f172a;
+      --muted: #64748b;
+      --primary: #4a7ab5;
+      --border: #e2e8f0;
+      --radius: 12px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1923;
+        --card: #1e2a35;
+        --fg: #f1f5f9;
+        --muted: #94a3b8;
+        --border: #2d3748;
+      }
+    }
+    body {
+      font-family: 'Assistant', 'Heebo', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2.5rem 2rem;
+      max-width: 380px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 4px 24px rgba(0,0,0,.06);
+    }
+    .icon {
+      font-size: 3rem;
+      margin-bottom: 1.25rem;
+      line-height: 1;
+    }
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: .5rem;
+    }
+    p {
+      color: var(--muted);
+      font-size: .95rem;
+      line-height: 1.6;
+      margin-bottom: 1.75rem;
+    }
+    button {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: .65rem 1.5rem;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity .15s;
+    }
+    button:hover { opacity: .88; }
+    .brand {
+      margin-top: 2rem;
+      font-size: .8rem;
+      color: var(--muted);
+      opacity: .6;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📡</div>
+    <h1>אין חיבור לאינטרנט</h1>
+    <p>
+      לא ניתן להתחבר לשרת כרגע.<br />
+      בדוק את חיבור הרשת ונסה שנית.
+    </p>
+    <button onclick="location.reload()">נסה שנית</button>
+    <div class="brand">GradeFlow</div>
+  </div>
+</body>
+</html>

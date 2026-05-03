@@ -1,0 +1,22 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="lm-right">
+      <rect x="60" y="0" width="60" height="120"/>
+    </clipPath>
+  </defs>
+
+  <!-- Terra cotta ring — behind -->
+  <circle cx="76" cy="60" r="28" stroke="#c0392b" stroke-width="12" fill="none"/>
+  <!-- F in terra cotta ring -->
+  <text x="76" y="67" font-family="Georgia, 'Times New Roman', serif" font-size="27" font-weight="700" fill="#f5e6c8" text-anchor="middle">F</text>
+
+  <!-- Blue ring — on top -->
+  <circle cx="44" cy="60" r="28" stroke="#4a7ab5" stroke-width="13" fill="none"/>
+  <!-- G in blue ring -->
+  <text x="44" y="67" font-family="Georgia, 'Times New Roman', serif" font-size="27" font-weight="700" fill="#f5e6c8" text-anchor="middle">G</text>
+
+  <!-- Terra cotta ring clipped right (in front of blue) -->
+  <circle cx="76" cy="60" r="28" stroke="#c0392b" stroke-width="12" fill="none" clip-path="url(#lm-right)"/>
+  <!-- F redrawn on top right half -->
+  <text x="76" y="67" font-family="Georgia, 'Times New Roman', serif" font-size="27" font-weight="700" fill="#f5e6c8" text-anchor="middle" clip-path="url(#lm-right)">F</text>
+</svg>

@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  email         String   @unique @db.VarChar(255)
+  passwordHash  String   @map("password_hash")
+  name          String   @db.VarChar(255)
+  role          String   @default("grader") @db.VarChar(32)
+  tokenVersion  Int      @default(0) @map("token_version")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  gradedSubmissions   Submission[]         @relation("GradedBy")
+  passwordResetTokens PasswordResetToken[]
+
+  @@map("users")
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "password_reset_tokens_user_id_idx")
+  @@map("password_reset_tokens")
+}
+
+model Course {
+  id        Int      @id @default(autoincrement())
+  code      String   @db.VarChar(64)
+  name      String   @db.VarChar(255)
+  term      String   @db.VarChar(32)
+  year      Int
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  enrollments       Enrollment[]
+  assignments       Assignment[]
+  feedbackTemplates FeedbackTemplate[]
+
+  @@unique([code, term, year], map: "courses_code_term_year_idx")
+  @@map("courses")
+}
+
+model Student {
+  id         Int      @id @default(autoincrement())
+  externalId String   @unique @map("external_id") @db.VarChar(64)
+  firstName  String   @map("first_name") @db.VarChar(128)
+  lastName   String   @map("last_name") @db.VarChar(128)
+  email      String?  @db.VarChar(255)
+  phone      String?  @db.VarChar(64)
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  enrollments Enrollment[]
+  submissions Submission[]
+
+  @@map("students")
+}
+
+model Enrollment {
+  id        Int      @id @default(autoincrement())
+  courseId  Int      @map("course_id")
+  studentId Int      @map("student_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, studentId], map: "enrollments_course_student_idx")
+  @@map("enrollments")
+}
+
+model Assignment {
+  id           Int       @id @default(autoincrement())
+  courseId     Int       @map("course_id")
+  name         String    @db.VarChar(255)
+  description  String?
+  dueDate      DateTime? @map("due_date") @db.Timestamptz(6)
+  maxScore     Decimal   @default(100) @map("max_score") @db.Decimal(6, 2)
+  weight       Decimal   @default(1) @db.Decimal(5, 2)
+  gradingScale String    @default("numeric") @map("grading_scale") @db.VarChar(16)
+  closed       Boolean   @default(false)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  course         Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  files          AssignmentFile[]
+  submissions    Submission[]
+  rubricCriteria RubricCriterion[]
+
+  @@map("assignments")
+}
+
+model AssignmentFile {
+  id           Int      @id @default(autoincrement())
+  assignmentId Int      @map("assignment_id")
+  name         String   @db.VarChar(255)
+  objectPath   String   @map("object_path")
+  contentType  String   @map("content_type") @db.VarChar(128)
+  size         Int
+  fileType     String   @default("extra") @map("file_type") @db.VarChar(32)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@map("assignment_files")
+}
+
+model Submission {
+  id              Int       @id @default(autoincrement())
+  assignmentId    Int       @map("assignment_id")
+  studentId       Int       @map("student_id")
+  status          String    @default("pending") @db.VarChar(32)
+  score           Decimal?  @db.Decimal(6, 2)
+  feedback        String?
+  privateNotes    String?   @map("private_notes")
+  originalityFlag Boolean   @default(false) @map("originality_flag")
+  submittedAt     DateTime? @map("submitted_at") @db.Timestamptz(6)
+  submittedLate   Boolean   @default(false) @map("submitted_late")
+  fileObjectPath  String?   @map("file_object_path")
+  fileName        String?   @map("file_name") @db.VarChar(255)
+  contentType     String?   @map("content_type") @db.VarChar(128)
+  fileSize        Int?      @map("file_size")
+  gradedAt        DateTime? @map("graded_at") @db.Timestamptz(6)
+  gradedById      Int?      @map("graded_by_id")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  assignment   Assignment    @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student      Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  gradedBy     User?         @relation("GradedBy", fields: [gradedById], references: [id], onDelete: SetNull)
+  rubricScores RubricScore[]
+
+  @@unique([assignmentId, studentId], map: "submissions_assignment_student_idx")
+  @@index([status], map: "submissions_status_idx")
+  @@map("submissions")
+}
+
+model RubricCriterion {
+  id           Int      @id @default(autoincrement())
+  assignmentId Int      @map("assignment_id")
+  name         String   @db.VarChar(255)
+  description  String?
+  maxPoints    Decimal  @default(10) @map("max_points") @db.Decimal(6, 2)
+  weight       Decimal  @default(1) @db.Decimal(5, 2)
+  orderIndex   Int      @default(0) @map("order_index")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  assignment Assignment    @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  scores     RubricScore[]
+
+  @@map("rubric_criteria")
+}
+
+model RubricScore {
+  id           Int      @id @default(autoincrement())
+  submissionId Int      @map("submission_id")
+  criterionId  Int      @map("criterion_id")
+  points       Decimal  @db.Decimal(6, 2)
+  comment      String?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  submission Submission      @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  criterion  RubricCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, criterionId], map: "rubric_scores_submission_criterion_idx")
+  @@map("rubric_scores")
+}
+
+model FeedbackTemplate {
+  id        Int      @id @default(autoincrement())
+  title     String   @db.VarChar(255)
+  body      String
+  category  String?  @db.VarChar(64)
+  courseId  Int?     @map("course_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  course Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("feedback_templates")
+}

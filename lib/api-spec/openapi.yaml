@@ -1,0 +1,1588 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: GradeFlow API
+servers:
+  - url: /api
+    description: Base API path
+security:
+  - cookieAuth: []
+tags:
+  - name: health
+  - name: auth
+  - name: users
+  - name: courses
+  - name: students
+  - name: enrollments
+  - name: assignments
+  - name: submissions
+  - name: rubric
+  - name: templates
+  - name: dashboard
+  - name: importExport
+  - name: Storage
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      security: []
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthUser" }
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /auth/change-password:
+    post:
+      operationId: changePassword
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChangePasswordRequest" }
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "400":
+          description: Invalid input or wrong current password
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /auth/revoke-sessions:
+    post:
+      operationId: revokeSessions
+      tags: [auth]
+      responses:
+        "200":
+          description: All sessions revoked
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+
+  /auth/request-password-reset:
+    post:
+      operationId: requestPasswordReset
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RequestPasswordResetRequest" }
+      responses:
+        "200":
+          description: |
+            Always returns `{ ok: true }` regardless of whether the email
+            matches a registered account — both the response shape and the
+            response timing are equalized to prevent account enumeration.
+            The reset link is NEVER returned in this response: it can only
+            be delivered through a trusted side channel (email integration).
+            When no email integration is configured, admins should use the
+            admin-issued temporary password flow at
+            `POST /users/{userId}/reset-password` instead.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PasswordResetRequestResult" }
+
+  /auth/reset-password:
+    post:
+      operationId: resetPassword
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResetPasswordRequest" }
+      responses:
+        "200":
+          description: Password reset
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "400":
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      responses:
+        "200":
+          description: All grader accounts (admin only)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/User" }
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    post:
+      operationId: createUser
+      tags: [users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateUserRequest" }
+      responses:
+        "201":
+          description: User created (admin only)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreatedUserResponse" }
+        "400":
+          description: Email already in use or invalid input
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /users/{userId}:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+    patch:
+      operationId: updateUser
+      tags: [users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateUserRequest" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "400":
+          description: Cannot delete the current account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /users/{userId}/reset-password:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+    post:
+      operationId: adminResetUserPassword
+      tags: [users]
+      responses:
+        "200":
+          description: |
+            Generates a temporary password for the user and revokes all of
+            their existing sessions. The temporary password is returned to
+            the admin so they can hand it off out-of-band.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminResetPasswordResponse" }
+
+  /courses:
+    get:
+      operationId: listCourses
+      tags: [courses]
+      parameters:
+        - in: query
+          name: includeArchived
+          schema: { type: boolean, default: true }
+      responses:
+        "200":
+          description: Courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Course" }
+    post:
+      operationId: createCourse
+      tags: [courses]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CourseInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Course" }
+
+  /courses/{courseId}:
+    parameters:
+      - $ref: "#/components/parameters/CourseId"
+    get:
+      operationId: getCourse
+      tags: [courses]
+      responses:
+        "200":
+          description: Course
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Course" }
+    patch:
+      operationId: updateCourse
+      tags: [courses]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CourseInput" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Course" }
+    delete:
+      operationId: deleteCourse
+      tags: [courses]
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+
+  /courses/{courseId}/archive:
+    parameters:
+      - $ref: "#/components/parameters/CourseId"
+    post:
+      operationId: archiveCourse
+      tags: [courses]
+      responses:
+        "200":
+          description: Archived
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Course" }
+
+  /courses/{courseId}/unarchive:
+    parameters:
+      - $ref: "#/components/parameters/CourseId"
+    post:
+      operationId: unarchiveCourse
+      tags: [courses]
+      responses:
+        "200":
+          description: Unarchived
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Course" }
+
+  /courses/{courseId}/students:
+    parameters:
+      - $ref: "#/components/parameters/CourseId"
+    get:
+      operationId: listCourseStudents
+      tags: [enrollments]
+      responses:
+        "200":
+          description: Enrolled students
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Student" }
+    post:
+      operationId: enrollStudent
+      tags: [enrollments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EnrollBody" }
+      responses:
+        "201":
+          description: Enrolled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+
+  /courses/{courseId}/students/{studentId}:
+    parameters:
+      - $ref: "#/components/parameters/CourseId"
+      - $ref: "#/components/parameters/StudentId"
+    delete:
+      operationId: unenrollStudent
+      tags: [enrollments]
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+
+  /courses/{courseId}/gradebook:
+    parameters:
+      - $ref: "#/components/parameters/CourseId"
+    get:
+      operationId: getGradebook
+      tags: [courses]
+      responses:
+        "200":
+          description: Gradebook
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Gradebook" }
+
+  /students:
+    get:
+      operationId: listStudents
+      tags: [students]
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+      responses:
+        "200":
+          description: Students
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Student" }
+    post:
+      operationId: createStudent
+      tags: [students]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StudentInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Student" }
+
+  /students/{studentId}/history:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+    get:
+      operationId: getStudentHistory
+      tags: [students]
+      responses:
+        "200":
+          description: Student submission history across all courses
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StudentHistory" }
+  /students/{studentId}:
+    parameters:
+      - $ref: "#/components/parameters/StudentId"
+    get:
+      operationId: getStudent
+      tags: [students]
+      responses:
+        "200":
+          description: Student
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Student" }
+    patch:
+      operationId: updateStudent
+      tags: [students]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StudentInput" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Student" }
+    delete:
+      operationId: deleteStudent
+      tags: [students]
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+
+  /assignments:
+    get:
+      operationId: listAssignments
+      tags: [assignments]
+      parameters:
+        - in: query
+          name: courseId
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Assignment" }
+    post:
+      operationId: createAssignment
+      tags: [assignments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssignmentInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Assignment" }
+
+  /assignments/{assignmentId}/close:
+    parameters:
+      - $ref: "#/components/parameters/AssignmentId"
+    post:
+      operationId: closeAssignment
+      tags: [assignments]
+      responses:
+        "200":
+          description: Closed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Assignment" }
+
+  /assignments/{assignmentId}/reopen:
+    parameters:
+      - $ref: "#/components/parameters/AssignmentId"
+    post:
+      operationId: reopenAssignment
+      tags: [assignments]
+      responses:
+        "200":
+          description: Reopened
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Assignment" }
+
+  /assignments/{assignmentId}:
+    parameters:
+      - $ref: "#/components/parameters/AssignmentId"
+    get:
+      operationId: getAssignment
+      tags: [assignments]
+      responses:
+        "200":
+          description: Assignment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssignmentDetail" }
+    patch:
+      operationId: updateAssignment
+      tags: [assignments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssignmentInput" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Assignment" }
+    delete:
+      operationId: deleteAssignment
+      tags: [assignments]
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+
+  /assignments/{assignmentId}/files:
+    parameters:
+      - $ref: "#/components/parameters/AssignmentId"
+    get:
+      operationId: listAssignmentFiles
+      tags: [assignments]
+      responses:
+        "200":
+          description: Files
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AssignmentFile" }
+    post:
+      operationId: attachAssignmentFile
+      tags: [assignments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssignmentFileInput" }
+      responses:
+        "201":
+          description: Attached
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssignmentFile" }
+
+  /assignments/{assignmentId}/files/{fileId}:
+    parameters:
+      - $ref: "#/components/parameters/AssignmentId"
+      - in: path
+        name: fileId
+        required: true
+        schema: { type: integer }
+    patch:
+      operationId: updateAssignmentFile
+      tags: [assignments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssignmentFilePatch" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssignmentFile" }
+    delete:
+      operationId: deleteAssignmentFile
+      tags: [assignments]
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+
+  /assignments/{assignmentId}/submissions:
+    parameters:
+      - $ref: "#/components/parameters/AssignmentId"
+    patch:
+      operationId: bulkUpdateSubmissions
+      tags: [assignments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkSubmissionUpdate" }
+      responses:
+        "200":
+          description: Bulk update result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [updated]
+                properties:
+                  updated: { type: integer }
+    get:
+      operationId: listSubmissions
+      tags: [submissions]
+      responses:
+        "200":
+          description: Submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SubmissionWithStudent" }
+
+  /submissions/{submissionId}:
+    parameters:
+      - $ref: "#/components/parameters/SubmissionId"
+    get:
+      operationId: getSubmission
+      tags: [submissions]
+      responses:
+        "200":
+          description: Submission
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubmissionDetail" }
+    patch:
+      operationId: updateSubmission
+      tags: [submissions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmissionInput" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubmissionDetail" }
+
+  /submissions/{submissionId}/file:
+    parameters:
+      - $ref: "#/components/parameters/SubmissionId"
+    post:
+      operationId: setSubmissionFile
+      tags: [submissions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmissionFileInput" }
+      responses:
+        "200":
+          description: File set
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubmissionDetail" }
+
+  /assignments/{assignmentId}/rubric:
+    parameters:
+      - $ref: "#/components/parameters/AssignmentId"
+    get:
+      operationId: getRubric
+      tags: [rubric]
+      responses:
+        "200":
+          description: Rubric criteria
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RubricCriterion" }
+    put:
+      operationId: setRubric
+      tags: [rubric]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetRubricRequest" }
+      responses:
+        "200":
+          description: Rubric saved
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RubricCriterion" }
+
+  /submissions/{submissionId}/rubric-scores:
+    parameters:
+      - $ref: "#/components/parameters/SubmissionId"
+    get:
+      operationId: getSubmissionRubricScores
+      tags: [rubric]
+      responses:
+        "200":
+          description: Rubric scores
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RubricScore" }
+    put:
+      operationId: setSubmissionRubricScores
+      tags: [rubric]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetRubricScoresRequest" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubmissionDetail" }
+
+  /feedback-templates:
+    get:
+      operationId: listFeedbackTemplates
+      tags: [templates]
+      parameters:
+        - in: query
+          name: courseId
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/FeedbackTemplate" }
+    post:
+      operationId: createFeedbackTemplate
+      tags: [templates]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FeedbackTemplateInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FeedbackTemplate" }
+
+  /feedback-templates/{templateId}:
+    parameters:
+      - in: path
+        name: templateId
+        required: true
+        schema: { type: integer }
+    patch:
+      operationId: updateFeedbackTemplate
+      tags: [templates]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FeedbackTemplateInput" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FeedbackTemplate" }
+    delete:
+      operationId: deleteFeedbackTemplate
+      tags: [templates]
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DashboardSummary" }
+
+  /dashboard/recent-submissions:
+    get:
+      operationId: getRecentSubmissions
+      tags: [dashboard]
+      responses:
+        "200":
+          description: Recent submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RecentSubmission" }
+
+  /import/students:
+    post:
+      operationId: importStudents
+      tags: [importExport]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ImportStudentsRequest" }
+      responses:
+        "200":
+          description: Imported
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportResult" }
+
+  /export/gradebook/{courseId}:
+    parameters:
+      - $ref: "#/components/parameters/CourseId"
+    get:
+      operationId: exportGradebookCsv
+      tags: [importExport]
+      responses:
+        "200":
+          description: CSV
+          content:
+            text/csv:
+              schema: { type: string }
+
+  /export/assignment/{assignmentId}:
+    parameters:
+      - $ref: "#/components/parameters/AssignmentId"
+    get:
+      operationId: exportAssignmentCsv
+      tags: [importExport]
+      responses:
+        "200":
+          description: CSV
+          content:
+            text/csv:
+              schema: { type: string }
+
+  /storage/uploads/request-url:
+    post:
+      tags: [Storage]
+      operationId: requestUploadUrl
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UploadUrlRequest" }
+      responses:
+        "200":
+          description: Presigned URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UploadUrlResponse" }
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "500":
+          description: Failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /storage/public-objects/{filePath}:
+    get:
+      tags: [Storage]
+      operationId: getPublicObject
+      parameters:
+        - in: path
+          name: filePath
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Object
+          content:
+            "*/*":
+              schema: { type: string, format: binary }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /storage/objects/{objectPath}:
+    get:
+      tags: [Storage]
+      operationId: getStorageObject
+      parameters:
+        - in: path
+          name: objectPath
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Object
+          content:
+            "*/*":
+              schema: { type: string, format: binary }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /assignment-files/{fileId}/preview:
+    get:
+      tags: [assignments]
+      operationId: previewAssignmentFile
+      parameters:
+        - in: path
+          name: fileId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: PDF stream rendered inline
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "404":
+          description: File not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "415":
+          description: Preview not supported for this file type — clients should fall back to download
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PreviewUnsupportedError" }
+
+  /assignment-files/{fileId}/download:
+    get:
+      tags: [assignments]
+      operationId: downloadAssignmentFile
+      parameters:
+        - in: path
+          name: fileId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Raw file download (Content-Disposition attachment)
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "404":
+          description: File not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: gradeflow_token
+      description: |
+        Session JWT cookie set by `POST /auth/login`. All endpoints require it
+        unless the operation explicitly overrides `security: []`.
+  parameters:
+    CourseId:
+      in: path
+      name: courseId
+      required: true
+      schema: { type: integer }
+    StudentId:
+      in: path
+      name: studentId
+      required: true
+      schema: { type: integer }
+    AssignmentId:
+      in: path
+      name: assignmentId
+      required: true
+      schema: { type: integer }
+    SubmissionId:
+      in: path
+      name: submissionId
+      required: true
+      schema: { type: integer }
+
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+
+    Ok:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 1 }
+
+    AuthUser:
+      type: object
+      required: [id, email, name, role]
+      properties:
+        id: { type: integer }
+        email: { type: string }
+        name: { type: string }
+        role: { type: string }
+
+    UserRole:
+      type: string
+      enum: [admin, lecturer, grader]
+
+    User:
+      type: object
+      required: [id, email, name, role, createdAt]
+      properties:
+        id: { type: integer }
+        email: { type: string }
+        name: { type: string }
+        role: { $ref: "#/components/schemas/UserRole" }
+        createdAt: { type: string, format: date-time }
+
+    CreateUserRequest:
+      type: object
+      required: [email, name, role]
+      properties:
+        email: { type: string, format: email }
+        name: { type: string, minLength: 1 }
+        role: { $ref: "#/components/schemas/UserRole" }
+        password:
+          type: string
+          minLength: 8
+          nullable: true
+          description: |
+            Optional. When omitted, the server generates a random temporary
+            password and returns it in the response so the admin can share it
+            with the new user.
+
+    CreatedUserResponse:
+      type: object
+      required: [user]
+      properties:
+        user: { $ref: "#/components/schemas/User" }
+        generatedPassword:
+          type: string
+          nullable: true
+          description: |
+            Random password generated when the request omitted `password`.
+            Shown only once — admins must save or share it immediately.
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        role: { $ref: "#/components/schemas/UserRole" }
+
+    AdminResetPasswordResponse:
+      type: object
+      required: [temporaryPassword]
+      properties:
+        temporaryPassword: { type: string }
+
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string, minLength: 1 }
+        newPassword: { type: string, minLength: 8 }
+
+    RequestPasswordResetRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+
+    PasswordResetRequestResult:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, newPassword]
+      properties:
+        token: { type: string, minLength: 1 }
+        newPassword: { type: string, minLength: 8 }
+
+    Course:
+      type: object
+      required: [id, code, name, term, year, archived]
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        name: { type: string }
+        term: { type: string }
+        year: { type: integer }
+        archived: { type: boolean }
+        studentCount: { type: integer }
+        assignmentCount: { type: integer }
+
+    CourseInput:
+      type: object
+      required: [code, name, term, year]
+      properties:
+        code: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        term: { type: string, minLength: 1 }
+        year: { type: integer }
+        archived: { type: boolean }
+
+    Student:
+      type: object
+      required: [id, externalId, firstName, lastName]
+      properties:
+        id: { type: integer }
+        externalId: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+
+    StudentInput:
+      type: object
+      required: [externalId, firstName, lastName]
+      properties:
+        externalId: { type: string, minLength: 1 }
+        firstName: { type: string, minLength: 1 }
+        lastName: { type: string, minLength: 1 }
+        email: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+
+    EnrollBody:
+      type: object
+      required: [studentId]
+      properties:
+        studentId: { type: integer }
+
+    Assignment:
+      type: object
+      required: [id, courseId, name, maxScore, weight, gradingScale, closed]
+      properties:
+        id: { type: integer }
+        courseId: { type: integer }
+        courseName: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        dueDate: { type: string, format: date-time, nullable: true }
+        maxScore: { type: number }
+        weight: { type: number }
+        gradingScale: { type: string }
+        closed: { type: boolean }
+        submissionCount: { type: integer }
+        gradedCount: { type: integer }
+
+    AssignmentDetail:
+      allOf:
+        - $ref: "#/components/schemas/Assignment"
+        - type: object
+          properties:
+            files:
+              type: array
+              items: { $ref: "#/components/schemas/AssignmentFile" }
+
+    AssignmentInput:
+      type: object
+      required: [courseId, name, maxScore, weight, gradingScale]
+      properties:
+        courseId: { type: integer }
+        name: { type: string, minLength: 1 }
+        description: { type: string, nullable: true }
+        dueDate: { type: string, format: date-time, nullable: true }
+        maxScore: { type: number }
+        weight: { type: number }
+        gradingScale: { type: string }
+
+    AssignmentFile:
+      type: object
+      required: [id, assignmentId, name, objectPath, contentType, size, fileType]
+      properties:
+        id: { type: integer }
+        assignmentId: { type: integer }
+        name: { type: string }
+        objectPath: { type: string }
+        contentType: { type: string }
+        size: { type: integer }
+        fileType:
+          type: string
+          enum: [instructions, grading_guide, reference, extra]
+
+    AssignmentFileInput:
+      type: object
+      required: [name, objectPath, contentType, size]
+      properties:
+        name: { type: string, minLength: 1 }
+        objectPath: { type: string, minLength: 1 }
+        contentType: { type: string, minLength: 1 }
+        size: { type: integer, minimum: 0 }
+        fileType:
+          type: string
+          enum: [instructions, grading_guide, reference, extra]
+
+    AssignmentFilePatch:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        fileType:
+          type: string
+          enum: [instructions, grading_guide, reference, extra]
+
+    Submission:
+      type: object
+      required: [id, assignmentId, studentId, status, originalityFlag, submittedLate]
+      properties:
+        id: { type: integer }
+        assignmentId: { type: integer }
+        studentId: { type: integer }
+        status:
+          type: string
+          enum: [pending, in_progress, needs_review, graded, returned, missing]
+        score: { type: number, nullable: true }
+        feedback: { type: string, nullable: true }
+        privateNotes: { type: string, nullable: true }
+        originalityFlag: { type: boolean }
+        submittedLate: { type: boolean }
+        submittedAt: { type: string, format: date-time, nullable: true }
+        fileObjectPath: { type: string, nullable: true }
+        fileName: { type: string, nullable: true }
+        contentType: { type: string, nullable: true }
+        fileSize: { type: integer, nullable: true }
+        gradedAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: string, format: date-time, nullable: true }
+
+    SubmissionWithStudent:
+      allOf:
+        - $ref: "#/components/schemas/Submission"
+        - type: object
+          properties:
+            student: { $ref: "#/components/schemas/Student" }
+
+    StudentHistoryItem:
+      allOf:
+        - $ref: "#/components/schemas/Submission"
+        - type: object
+          required: [assignment, course]
+          properties:
+            assignment:
+              type: object
+              required: [id, title, maxScore, courseId]
+              properties:
+                id: { type: integer }
+                title: { type: string }
+                maxScore: { type: number }
+                dueDate: { type: string, format: date-time, nullable: true }
+                courseId: { type: integer }
+            course:
+              type: object
+              required: [id, name, code]
+              properties:
+                id: { type: integer }
+                name: { type: string }
+                code: { type: string }
+
+    StudentHistory:
+      type: object
+      required: [student, items, summary]
+      properties:
+        student: { $ref: "#/components/schemas/Student" }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/StudentHistoryItem" }
+        summary:
+          type: object
+          required: [totalSubmissions, gradedCount, averageScore]
+          properties:
+            totalSubmissions: { type: integer }
+            gradedCount: { type: integer }
+            averageScore: { type: number, nullable: true }
+
+    SubmissionDetail:
+      allOf:
+        - $ref: "#/components/schemas/SubmissionWithStudent"
+        - type: object
+          properties:
+            assignment: { $ref: "#/components/schemas/Assignment" }
+            rubricScores:
+              type: array
+              items: { $ref: "#/components/schemas/RubricScore" }
+
+    BulkSubmissionUpdate:
+      type: object
+      required: [submissionIds, status]
+      properties:
+        submissionIds:
+          type: array
+          minItems: 1
+          items: { type: integer }
+        status:
+          type: string
+          enum: [pending, in_progress, needs_review, graded, returned, missing]
+
+    SubmissionInput:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, in_progress, needs_review, graded, returned, missing]
+        score: { type: number, nullable: true }
+        feedback: { type: string, nullable: true }
+        privateNotes: { type: string, nullable: true }
+        originalityFlag: { type: boolean }
+        submittedLate: { type: boolean }
+        submittedAt: { type: string, format: date-time, nullable: true }
+
+    SubmissionFileInput:
+      type: object
+      required: [objectPath, fileName, contentType, fileSize]
+      properties:
+        objectPath: { type: string }
+        fileName: { type: string }
+        contentType: { type: string }
+        fileSize: { type: integer }
+
+    SetRubricRequest:
+      type: object
+      required: [criteria]
+      properties:
+        criteria:
+          type: array
+          items: { $ref: "#/components/schemas/RubricCriterionInput" }
+
+    SetRubricScoresRequest:
+      type: object
+      required: [scores]
+      properties:
+        scores:
+          type: array
+          items: { $ref: "#/components/schemas/RubricScoreInput" }
+
+    RubricCriterion:
+      type: object
+      required: [id, assignmentId, name, maxPoints, weight, orderIndex]
+      properties:
+        id: { type: integer }
+        assignmentId: { type: integer }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        maxPoints: { type: number }
+        weight: { type: number }
+        orderIndex: { type: integer }
+
+    RubricCriterionInput:
+      type: object
+      required: [name, maxPoints, weight, orderIndex]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string, nullable: true }
+        maxPoints: { type: number }
+        weight: { type: number }
+        orderIndex: { type: integer }
+
+    RubricScore:
+      type: object
+      required: [id, submissionId, criterionId, points]
+      properties:
+        id: { type: integer }
+        submissionId: { type: integer }
+        criterionId: { type: integer }
+        points: { type: number }
+        comment: { type: string, nullable: true }
+
+    RubricScoreInput:
+      type: object
+      required: [criterionId, points]
+      properties:
+        criterionId: { type: integer }
+        points: { type: number }
+        comment: { type: string, nullable: true }
+
+    FeedbackTemplate:
+      type: object
+      required: [id, title, body]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        body: { type: string }
+        category: { type: string, nullable: true }
+        courseId: { type: integer, nullable: true }
+
+    FeedbackTemplateInput:
+      type: object
+      required: [title, body]
+      properties:
+        title: { type: string, minLength: 1 }
+        body: { type: string, minLength: 1 }
+        category: { type: string, nullable: true }
+        courseId: { type: integer, nullable: true }
+
+    Gradebook:
+      type: object
+      required: [course, assignments, students, grades]
+      properties:
+        course: { $ref: "#/components/schemas/Course" }
+        assignments:
+          type: array
+          items: { $ref: "#/components/schemas/Assignment" }
+        students:
+          type: array
+          items: { $ref: "#/components/schemas/Student" }
+        grades:
+          type: array
+          items:
+            type: object
+            required: [studentId, assignmentId]
+            properties:
+              studentId: { type: integer }
+              assignmentId: { type: integer }
+              submissionId: { type: integer, nullable: true }
+              status: { type: string, nullable: true }
+              score: { type: number, nullable: true }
+
+    DashboardSummary:
+      type: object
+      required: [totalCourses, activeCourses, totalStudents, totalAssignments, pendingGrading, gradedThisWeek, statusBreakdown]
+      properties:
+        totalCourses: { type: integer }
+        activeCourses: { type: integer }
+        totalStudents: { type: integer }
+        totalAssignments: { type: integer }
+        pendingGrading: { type: integer }
+        gradedThisWeek: { type: integer }
+        originalityFlagged: { type: integer }
+        lateSubmissions: { type: integer }
+        statusBreakdown:
+          type: object
+          properties:
+            pending: { type: integer }
+            in_progress: { type: integer }
+            needs_review: { type: integer }
+            graded: { type: integer }
+            returned: { type: integer }
+            missing: { type: integer }
+
+    RecentSubmission:
+      type: object
+      required: [id, status, updatedAt, assignmentId]
+      properties:
+        id: { type: integer }
+        status: { type: string }
+        score: { type: number, nullable: true }
+        updatedAt: { type: string, format: date-time }
+        studentName: { type: string }
+        assignmentId: { type: integer }
+        assignmentName: { type: string }
+        courseName: { type: string }
+
+    ImportStudentsRequest:
+      type: object
+      required: [csv]
+      properties:
+        csv: { type: string }
+        courseId: { type: integer, nullable: true }
+
+    ImportResult:
+      type: object
+      required: [created, updated, enrolled, errors]
+      properties:
+        created: { type: integer }
+        updated: { type: integer }
+        enrolled: { type: integer }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              row: { type: integer }
+              message: { type: string }
+
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name: { type: string, minLength: 1 }
+        size: { type: integer, minimum: 1 }
+        contentType: { type: string, minLength: 1 }
+
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL: { type: string, format: uri }
+        objectPath: { type: string }
+        metadata: { $ref: "#/components/schemas/UploadUrlRequest" }
+
+    PreviewUnsupportedError:
+      type: object
+      required: [error, code]
+      properties:
+        error: { type: string }
+        code:
+          type: string
+          enum: [PREVIEW_REQUIRES_DOWNLOAD, PREVIEW_UNSUPPORTED]
