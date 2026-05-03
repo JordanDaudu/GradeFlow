@@ -31,3 +31,12 @@ README.md
 replit.md
 replit.nix
 .replit
+
+# Extra local/OS/build noise
+.DS_Store
+__MACOSX
+*.tsbuildinfo
+**/*.tsbuildinfo
+playwright-report
+**/playwright-report
+.vscode
