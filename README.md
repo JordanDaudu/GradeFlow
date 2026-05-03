@@ -10,7 +10,7 @@ A focused grading workspace built for university teaching assistants and lecture
 2. [Installable App (PWA)](#installable-app-pwa)
 3. [Tech Stack](#tech-stack)
 4. [Architecture Overview](#architecture-overview)
-5. [Running with Docker (self-hosted)](#running-with-docker-self-hosted)
+5. [Universal Docker Run Options](#universal-docker-run-options)
 6. [Running in Development (Replit)](#running-in-development-replit)
 7. [Environment Variables](#environment-variables)
 8. [Database](#database)
@@ -158,110 +158,500 @@ GradeFlow ships a [Web App Manifest](frontend/public/manifest.webmanifest) that 
 
 ---
 
-## Running with Docker (self-hosted)
+## Universal Docker Run Options
 
-This is the recommended way to run GradeFlow outside of Replit. A single command starts everything — no cloud accounts required.
+GradeFlow can be run on any machine that has Docker installed, including macOS, Windows, and Linux.
 
-### Prerequisites
+The project supports two Docker-based run modes:
 
-- Docker Engine ≥ 24 with Compose V2 (`docker compose` — note: no hyphen)
-- Ports 3000, 9000, and 9001 available on the host
+1. **Run from published Docker Hub images** — best for demos, grading, and running on another computer without building the source code.
+2. **Run from source code** — best for development, testing, and making changes locally.
 
-### Quick start
+The published Docker images support:
+
+```text
+linux/amd64
+linux/arm64
+```
+
+This means the same images can run on most Windows/Linux PCs, Intel/AMD servers, and Apple Silicon Macs.
+
+---
+
+## Option 1: Run from Published Docker Hub Images
+
+This option does **not** require building the project locally.
+
+It pulls the already-published backend and frontend images from Docker Hub:
+
+```text
+jordandaudu/gradeflow-backend:latest
+jordandaudu/gradeflow-frontend:latest
+```
+
+### 1. Create a project folder
+
+macOS/Linux/Git Bash:
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/your-org/gradeflow.git
+mkdir gradeflow
 cd gradeflow
+```
 
-# 2. Create your .env file
+Windows PowerShell:
+
+```powershell
+mkdir gradeflow
+cd gradeflow
+```
+
+### 2. Create `docker-compose.yml`
+
+Create a file named:
+
+```text
+docker-compose.yml
+```
+
+Paste the following content into it:
+
+```yaml
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gradeflow
+      POSTGRES_PASSWORD: gradeflow_password
+      POSTGRES_DB: gradeflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - gradeflow_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gradeflow -d gradeflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - gradeflow_minio:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  backend:
+    image: jordandaudu/gradeflow-backend:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+
+      DATABASE_URL: postgresql://gradeflow:gradeflow_password@db:5432/gradeflow
+
+      JWT_SECRET: replace_this_with_a_long_random_secret
+      FRONTEND_BASE_URL: http://localhost:3000
+
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
+      S3_BUCKET: gradeflow
+      S3_ACCESS_KEY_ID: minioadmin
+      S3_SECRET_ACCESS_KEY: minioadmin
+      S3_FORCE_PATH_STYLE: "true"
+
+      RESEND_API_KEY: ""
+      EMAIL_FROM: "GradeFlow <noreply@example.com>"
+    ports:
+      - "8080:8080"
+
+  frontend:
+    image: jordandaudu/gradeflow-frontend:latest
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+
+volumes:
+  gradeflow_db:
+    name: gradeflow_db
+  gradeflow_minio:
+    name: gradeflow_minio
+```
+
+### 3. Generate a JWT secret
+
+Replace this value in the compose file:
+
+```text
+replace_this_with_a_long_random_secret
+```
+
+Generate a secure value:
+
+macOS/Linux/Git Bash:
+
+```bash
+openssl rand -hex 64
+```
+
+Windows PowerShell:
+
+```powershell
+[Convert]::ToHexString((1..64 | ForEach-Object { Get-Random -Maximum 256 }))
+```
+
+Paste the generated value into:
+
+```yaml
+JWT_SECRET: your_generated_secret_here
+```
+
+### 4. Pull and start the application
+
+macOS/Linux/Git Bash:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Windows PowerShell:
+
+```powershell
+docker compose pull
+docker compose up -d
+```
+
+### 5. Check that the containers are running
+
+```bash
+docker compose ps
+```
+
+Expected services:
+
+```text
+db
+minio
+backend
+frontend
+```
+
+### 6. Verify backend health
+
+macOS/Linux/Git Bash:
+
+```bash
+curl http://localhost:3000/api/healthz
+```
+
+Windows PowerShell:
+
+```powershell
+curl.exe http://localhost:3000/api/healthz
+```
+
+Expected response:
+
+```json
+{
+  "status": "ok"
+}
+```
+
+### 7. Open the app
+
+Open this URL in your browser:
+
+```text
+http://localhost:3000
+```
+
+Useful URLs:
+
+```text
+Frontend:      http://localhost:3000
+API Health:    http://localhost:3000/api/healthz
+Swagger Docs:  http://localhost:3000/api/docs
+MinIO Console: http://localhost:9001
+```
+
+### 8. Default seeded users
+
+On first startup, if the database has no users, the backend seeds default accounts:
+
+```text
+Admin:    admin@gradeflow.app    / admin123
+Lecturer: lecturer@gradeflow.app / lecturer123
+Grader:   grader@gradeflow.app   / grader123
+```
+
+Change these passwords after first login.
+
+---
+
+## Option 2: Run from Source Code
+
+This option builds the backend and frontend Docker images locally from the repository source code.
+
+Use this option if you want to inspect the code, modify the project, run tests, or rebuild the application yourself.
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/JordanDaudu/GradeFlow.git
+cd GradeFlow
+```
+
+### 2. Create the local environment file
+
+macOS/Linux/Git Bash:
+
+```bash
 cp .env.example .env
-# Open .env and set at minimum:
-#   POSTGRES_PASSWORD — any strong password
-#   JWT_SECRET       — run: openssl rand -hex 64
-
-# 3. Build and start all services
-docker compose up --build
 ```
 
-The app is reachable at **http://localhost:3000**.
+Windows PowerShell:
 
-On **first boot**, the backend detects an empty database, runs migrations, and automatically seeds default accounts. The credentials are printed to the container log:
-
-```
-[entrypoint] Default credentials created:
-[entrypoint]   Admin    : admin@gradeflow.app    / admin123
-[entrypoint]   Lecturer : lecturer@gradeflow.app / lecturer123
-[entrypoint]   Grader   : grader@gradeflow.app   / grader123
-[entrypoint] Change these passwords after first login!
+```powershell
+Copy-Item .env.example .env
 ```
 
-Subsequent restarts skip the seed — the check is idempotent (counts existing users).
+### 3. Generate a JWT secret
 
-### Containers
+macOS/Linux/Git Bash:
 
-| Container | Image | Host ports | Notes |
-|-----------|-------|------------|-------|
-| `db` | postgres:16-alpine | — | PostgreSQL; named volume `gradeflow_db` |
-| `minio` | minio/minio:latest | 9000, 9001 | S3-compatible object store; named volume `gradeflow_minio` |
-| `backend` | node:22-slim (built) | — | NestJS API; runs migrations + optional first-boot seed |
-| `frontend` | nginx:1.27-alpine (built) | 3000 | Serves the React SPA; proxies `/api/` to backend |
-
-### MinIO object storage
-
-GradeFlow bundles [MinIO](https://min.io/) so file uploads and previews work without any cloud account. MinIO is an S3-compatible object store that runs on your own machine.
-
-| Port | Purpose |
-|------|---------|
-| **9000** | S3 API — browsers upload files here directly via presigned PUT URLs |
-| **9001** | MinIO web console — browse stored files at http://localhost:9001 |
-
-Default credentials (change these for production): `minioadmin` / `minioadmin`
-
-The backend creates the storage bucket automatically on first startup.
-
-**Remote / production deployments** — the browser must be able to reach MinIO's port 9000 to upload files. Set `S3_PUBLIC_ENDPOINT` in `.env` to the server's public IP or domain:
-
-```dotenv
-S3_PUBLIC_ENDPOINT=http://your-server-ip:9000
+```bash
+openssl rand -hex 64
 ```
 
-**Using real AWS S3 instead of MinIO** — see the comments at the bottom of `.env.example`.
+Windows PowerShell:
 
-### Docker environment variables
+```powershell
+[Convert]::ToHexString((1..64 | ForEach-Object { Get-Random -Maximum 256 }))
+```
 
-Copy `.env.example` to `.env` and adjust as needed.
+Open `.env` and set:
 
-| Variable | Required | Default | Purpose |
-|----------|----------|---------|---------|
-| `POSTGRES_USER` | Yes | — | PostgreSQL username |
-| `POSTGRES_PASSWORD` | Yes | — | PostgreSQL password |
-| `POSTGRES_DB` | Yes | — | PostgreSQL database name |
-| `JWT_SECRET` | Yes | — | Signs JWTs — use `openssl rand -hex 64` |
-| `S3_ACCESS_KEY_ID` | No | `minioadmin` | MinIO/AWS access key (also the MinIO root user) |
-| `S3_SECRET_ACCESS_KEY` | No | `minioadmin` | MinIO/AWS secret key (also the MinIO root password) |
-| `S3_BUCKET` | No | `gradeflow` | Bucket name — created automatically on first start |
-| `S3_REGION` | No | `us-east-1` | AWS region (any value works for MinIO) |
-| `S3_PUBLIC_ENDPOINT` | No | `http://localhost:9000` | Browser-facing MinIO URL for presigned uploads |
-| `RESEND_API_KEY` | No | — | Resend API key for password-reset emails |
-| `RESEND_FROM_EMAIL` | No | — | From-address for password-reset emails |
-| `FRONTEND_BASE_URL` | No | `http://localhost:3000` | Used in email reset links |
-| `FRONTEND_PORT` | No | `3000` | Host port for the nginx frontend container |
-| `MINIO_API_PORT` | No | `9000` | Host port for the MinIO S3 API |
-| `MINIO_CONSOLE_PORT` | No | `9001` | Host port for the MinIO web console |
+```env
+JWT_SECRET=your_generated_secret_here
+```
 
-### Docker files
+For local Docker, the important environment values are:
 
-| File | Purpose |
-|------|---------|
-| `docker-compose.yml` | Orchestrates all four containers |
-| `docker/backend/Dockerfile` | Two-stage build: Node 22 builder → Node 22 slim runner |
-| `docker/backend/entrypoint.sh` | Runs migrations, optional first-boot seed, then starts NestJS |
-| `docker/frontend/Dockerfile` | Two-stage build: Node 22 builder → nginx 1.27 runner |
-| `docker/frontend/nginx.conf` | Serves the Vite SPA; proxies `/api/` to the backend |
-| `.env.example` | Template for all environment variables with inline documentation |
+```env
+POSTGRES_USER=gradeflow
+POSTGRES_PASSWORD=gradeflow_password
+POSTGRES_DB=gradeflow
 
-> **Node 22 Debian slim — not Alpine**: the monorepo excludes `linux-x64-musl` platform binaries for esbuild, rollup, and lightningcss, so Alpine-based images would fail at runtime.
+DATABASE_URL=postgresql://gradeflow:gradeflow_password@db:5432/gradeflow
+
+FRONTEND_BASE_URL=http://localhost:3000
+
+STORAGE_BACKEND=s3
+S3_ENDPOINT=http://minio:9000
+S3_PUBLIC_ENDPOINT=http://localhost:9000
+S3_BUCKET=gradeflow
+S3_ACCESS_KEY_ID=minioadmin
+S3_SECRET_ACCESS_KEY=minioadmin
+S3_FORCE_PATH_STYLE=true
+```
+
+Important:
+
+```text
+S3_ENDPOINT is used by the backend inside Docker.
+S3_PUBLIC_ENDPOINT is used by the browser.
+```
+
+For local Docker, this is why:
+
+```env
+S3_ENDPOINT=http://minio:9000
+S3_PUBLIC_ENDPOINT=http://localhost:9000
+```
+
+### 4. Build and start the full stack
+
+```bash
+docker compose up -d --build
+```
+
+This starts:
+
+```text
+PostgreSQL database container
+MinIO object storage container
+NestJS backend container
+React/Vite frontend container served by Nginx
+```
+
+### 5. Check container status
+
+```bash
+docker compose ps
+```
+
+Expected services:
+
+```text
+db
+minio
+backend
+frontend
+```
+
+### 6. Verify backend health
+
+macOS/Linux/Git Bash:
+
+```bash
+curl http://localhost:3000/api/healthz
+```
+
+Windows PowerShell:
+
+```powershell
+curl.exe http://localhost:3000/api/healthz
+```
+
+Expected response:
+
+```json
+{
+  "status": "ok"
+}
+```
+
+### 7. Open the app
+
+Open this URL in your browser:
+
+```text
+http://localhost:3000
+```
+
+Useful URLs:
+
+```text
+Frontend:      http://localhost:3000
+API Health:    http://localhost:3000/api/healthz
+Swagger Docs:  http://localhost:3000/api/docs
+MinIO Console: http://localhost:9001
+```
+
+### 8. Default seeded users
+
+On first startup, if the database has no users, the backend seeds default accounts:
+
+```text
+Admin:    admin@gradeflow.app    / admin123
+Lecturer: lecturer@gradeflow.app / lecturer123
+Grader:   grader@gradeflow.app   / grader123
+```
+
+Change these passwords after first login.
+
+---
+
+## Stopping the Application
+
+Stop the containers while keeping the database and uploaded file data:
+
+```bash
+docker compose down
+```
+
+Start again later:
+
+```bash
+docker compose up -d
+```
+
+Stop the containers and delete all local database and MinIO data:
+
+```bash
+docker compose down -v
+```
+
+Use `down -v` only when you want to fully reset local GradeFlow data.
+
+---
+
+## Rebuilding After Code Changes
+
+If you changed backend or frontend code:
+
+```bash
+docker compose up -d --build
+```
+
+If Docker cache causes issues, rebuild without cache:
+
+```bash
+docker compose build --no-cache
+docker compose up -d
+```
+
+---
+
+## Docker Hub Images
+
+The project publishes Docker images automatically when changes are pushed to the `main` branch.
+
+Published images:
+
+```text
+jordandaudu/gradeflow-backend:latest
+jordandaudu/gradeflow-frontend:latest
+```
+
+Each workflow run also publishes commit-specific tags:
+
+```text
+jordandaudu/gradeflow-backend:<commit-sha>
+jordandaudu/gradeflow-frontend:<commit-sha>
+```
+
+The images are built for:
+
+```text
+linux/amd64
+linux/arm64
+```
+
+This makes them portable across most modern Docker environments.
+
+---
+
+## Notes
+
+- PostgreSQL stores GradeFlow relational data.
+- MinIO provides local S3-compatible object storage for uploaded assignment/submission files.
+- The backend automatically applies Prisma migrations on container startup.
+- The backend seeds default users only when no users exist.
+- The frontend is served by Nginx and proxies `/api/*` requests to the backend.
+- `.env` should never be committed to Git.
 
 ---
 
@@ -669,7 +1059,7 @@ All routes are prefixed with `/api`. The full interactive reference is at `/api/
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/api/healthz` | Public | Returns `{ "ok": true }` |
+| `GET` | `/api/healthz` | Public | Returns `{ "status": "ok" }` |
 
 ---
 
