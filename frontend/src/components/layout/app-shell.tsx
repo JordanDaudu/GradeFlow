@@ -90,10 +90,15 @@ export function AppShell({ children }: AppShellProps) {
 
   const handleLogout = () => {
     logout.mutate(undefined, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetCurrentUserQueryKey() });
+      onSuccess: async () => {
+        const currentUserQueryKey = getGetCurrentUserQueryKey();
+
+        await queryClient.cancelQueries({ queryKey: currentUserQueryKey });
+        queryClient.removeQueries({ queryKey: currentUserQueryKey });
+        queryClient.clear();
+
         setLocation("/login");
-      }
+      },
     });
   };
 

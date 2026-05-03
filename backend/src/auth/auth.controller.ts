@@ -21,6 +21,13 @@ const COOKIE_OPTS = {
   path: '/',
 };
 
+const CLEAR_COOKIE_OPTS = {
+  httpOnly: COOKIE_OPTS.httpOnly,
+  sameSite: COOKIE_OPTS.sameSite,
+  secure: COOKIE_OPTS.secure,
+  path: COOKIE_OPTS.path,
+};
+
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
@@ -42,7 +49,7 @@ export class AuthController {
   @HttpCode(200)
   @Post('logout')
   logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie(AUTH_COOKIE_NAME, { path: '/' });
+    res.clearCookie(AUTH_COOKIE_NAME, CLEAR_COOKIE_OPTS);
     return { ok: true };
   }
 
@@ -74,7 +81,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     await this.auth.revokeSessions(user.id);
-    res.clearCookie(AUTH_COOKIE_NAME, { path: '/' });
+    res.clearCookie(AUTH_COOKIE_NAME, CLEAR_COOKIE_OPTS);
     return { ok: true };
   }
 
