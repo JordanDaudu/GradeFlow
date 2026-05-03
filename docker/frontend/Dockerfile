@@ -2,7 +2,7 @@ FROM node:22-slim AS builder
 
 WORKDIR /workspace
 
-RUN npm install -g pnpm@9
+RUN npm install -g pnpm@11.0.4
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc tsconfig.base.json ./
 
@@ -12,13 +12,11 @@ COPY lib/api-client-react/package.json lib/api-client-react/
 COPY lib/api-zod/package.json lib/api-zod/
 COPY backend/package.json backend/
 COPY scripts/package.json scripts/
-COPY artifacts/mockup-sandbox/package.json artifacts/mockup-sandbox/
 
 RUN pnpm install --frozen-lockfile
 
 COPY frontend/ frontend/
 COPY lib/ lib/
-COPY attached_assets/ attached_assets/
 
 RUN pnpm --filter @workspace/gradeflow run build
 

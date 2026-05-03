@@ -2,7 +2,7 @@ FROM node:22-slim AS builder
 
 WORKDIR /workspace
 
-RUN npm install -g pnpm@9
+RUN npm install -g pnpm@11.0.4
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc tsconfig.json tsconfig.base.json ./
 
@@ -12,7 +12,6 @@ COPY lib/api-client-react/package.json lib/api-client-react/
 COPY lib/api-zod/package.json lib/api-zod/
 COPY frontend/package.json frontend/
 COPY scripts/package.json scripts/
-COPY artifacts/mockup-sandbox/package.json artifacts/mockup-sandbox/
 
 RUN pnpm install --frozen-lockfile
 
@@ -30,7 +29,7 @@ RUN apt-get update \
 
 WORKDIR /workspace
 
-RUN npm install -g pnpm@9
+RUN npm install -g pnpm@11.0.4
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 
@@ -40,7 +39,6 @@ COPY lib/api-client-react/package.json lib/api-client-react/
 COPY lib/api-zod/package.json lib/api-zod/
 COPY frontend/package.json frontend/
 COPY scripts/package.json scripts/
-COPY artifacts/mockup-sandbox/package.json artifacts/mockup-sandbox/
 
 COPY backend/prisma backend/prisma
 COPY backend/tsconfig.json backend/tsconfig.json
