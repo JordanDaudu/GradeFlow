@@ -97,8 +97,13 @@ export default function SettingsPage() {
 
   const handleLogout = () => {
     logout.mutate(undefined, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetCurrentUserQueryKey() });
+      onSuccess: async () => {
+        const currentUserQueryKey = getGetCurrentUserQueryKey();
+
+        await queryClient.cancelQueries({ queryKey: currentUserQueryKey });
+        queryClient.removeQueries({ queryKey: currentUserQueryKey });
+        queryClient.clear();
+
         setLocation("/login");
       },
     });
@@ -124,9 +129,15 @@ export default function SettingsPage() {
 
   const handleRevokeSessions = () => {
     revokeSessions.mutate(undefined, {
-      onSuccess: () => {
+      onSuccess: async () => {
         toast.success("כל ההפעלות נותקו. נא להתחבר מחדש.");
-        queryClient.invalidateQueries({ queryKey: getGetCurrentUserQueryKey() });
+
+        const currentUserQueryKey = getGetCurrentUserQueryKey();
+
+        await queryClient.cancelQueries({ queryKey: currentUserQueryKey });
+        queryClient.removeQueries({ queryKey: currentUserQueryKey });
+        queryClient.clear();
+
         setLocation("/login");
       },
       onError: () => {
