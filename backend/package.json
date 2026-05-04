@@ -13,7 +13,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:reset": "prisma migrate reset --force",
     "prisma:studio": "prisma studio",
-    "seed": "ts-node --transpile-only prisma/seed.ts"
+    "seed": "ts-node --transpile-only prisma/seed.ts",
+    "import:moodle-students": "ts-node --transpile-only scripts/import-moodle-students.ts"
   },
   "prisma": {
     "seed": "ts-node --transpile-only prisma/seed.ts"
