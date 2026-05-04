@@ -60,6 +60,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useTheme, type ThemePreference } from "@/lib/use-theme";
+import { InstallAppCard } from "@/components/layout/install-app-card";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "מנהל מערכת",
@@ -267,6 +268,14 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.08 }}
+      >
+        <InstallAppCard />
       </motion.div>
 
       <motion.div
