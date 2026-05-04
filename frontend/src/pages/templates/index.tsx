@@ -128,7 +128,7 @@ export default function TemplatesPage() {
           onSuccess: () => {
             toast.success("התבנית עודכנה בהצלחה");
             setIsDialogOpen(false);
-            queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/feedback-templates"] });
           },
           onError: () => toast.error("אירעה שגיאה בעדכון התבנית")
         }
@@ -140,7 +140,7 @@ export default function TemplatesPage() {
           onSuccess: () => {
             toast.success("התבנית נוצרה בהצלחה");
             setIsDialogOpen(false);
-            queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/feedback-templates"] });
           },
           onError: () => toast.error("אירעה שגיאה ביצירת התבנית")
         }
@@ -157,7 +157,7 @@ export default function TemplatesPage() {
         onSuccess: () => {
           toast.success("התבנית נמחקה בהצלחה");
           setDeleteTemplateId(null);
-          queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/feedback-templates"] });
         },
         onError: () => {
           toast.error("אירעה שגיאה במחיקת התבנית");

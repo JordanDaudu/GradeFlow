@@ -25,7 +25,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
-import { useForm } from "react-hook-form";
+import { useForm, type Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 
@@ -129,6 +129,108 @@ function studentToFormValues(s: Student): StudentFormValues {
     phone: s.phone ?? "",
     notes: s.notes ?? "",
   };
+}
+
+function StudentFormFields({ control }: { control: Control<StudentFormValues> }) {
+  return (
+    <>
+      <FormField
+        control={control}
+        name="externalId"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>תעודת זהות / מזהה ייחודי</FormLabel>
+            <FormControl>
+              <Input placeholder="ת.ז / מזהה סטודנט" {...field} dir="ltr" className="text-right" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <div className="grid grid-cols-2 gap-4">
+        <FormField
+          control={control}
+          name="firstName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>שם פרטי</FormLabel>
+              <FormControl>
+                <Input placeholder="ישראל" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={control}
+          name="lastName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>שם משפחה</FormLabel>
+              <FormControl>
+                <Input placeholder="ישראלי" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+
+      <FormField
+        control={control}
+        name="email"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>אימייל (אופציונלי)</FormLabel>
+            <FormControl>
+              <Input
+                placeholder="student@example.com"
+                type="email"
+                {...field}
+                dir="ltr"
+                className="text-right"
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={control}
+        name="phone"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>טלפון (אופציונלי)</FormLabel>
+            <FormControl>
+              <Input placeholder="050-0000000" {...field} dir="ltr" className="text-right" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={control}
+        name="notes"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>הערות (אופציונלי)</FormLabel>
+            <FormControl>
+              <Textarea
+                placeholder="הערות מיוחדות לגבי הסטודנט..."
+                {...field}
+                className="resize-none h-20"
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    </>
+  );
 }
 
 export default function StudentsPage() {
@@ -251,6 +353,7 @@ export default function StudentsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
       queryClient.invalidateQueries({ queryKey: ["/api/courses"] });
       queryClient.invalidateQueries({ queryKey: [`/api/courses/${courseId}/students`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
 
       setIsImportOpen(false);
       resetImportDialog();
@@ -274,6 +377,7 @@ export default function StudentsPage() {
           setIsCreateOpen(false);
           createForm.reset();
           queryClient.invalidateQueries({ queryKey: ["/api/students"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
         },
         onError: () => {
           toast.error("אירעה שגיאה בהוספת הסטודנט");
@@ -314,6 +418,7 @@ export default function StudentsPage() {
           toast.success("הסטודנט נמחק בהצלחה");
           setDeleteStudentId(null);
           queryClient.invalidateQueries({ queryKey: ["/api/students"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
         },
         onError: () => {
           toast.error("אירעה שגיאה במחיקת הסטודנט");
@@ -323,90 +428,6 @@ export default function StudentsPage() {
     );
   };
 
-  const StudentFormFields = ({ control }: { control: typeof createForm.control }) => (
-    <>
-      <FormField
-        control={control}
-        name="externalId"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>תעודת זהות / מזהה ייחודי</FormLabel>
-            <FormControl>
-              <Input placeholder="ת.ז / מזהה סטודנט" {...field} dir="ltr" className="text-right" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <div className="grid grid-cols-2 gap-4">
-        <FormField
-          control={control}
-          name="firstName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>שם פרטי</FormLabel>
-              <FormControl>
-                <Input placeholder="ישראל" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={control}
-          name="lastName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>שם משפחה</FormLabel>
-              <FormControl>
-                <Input placeholder="ישראלי" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
-      <FormField
-        control={control}
-        name="email"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>אימייל (אופציונלי)</FormLabel>
-            <FormControl>
-              <Input placeholder="student@example.com" type="email" {...field} dir="ltr" className="text-right" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={control}
-        name="phone"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>טלפון (אופציונלי)</FormLabel>
-            <FormControl>
-              <Input placeholder="050-0000000" {...field} dir="ltr" className="text-right" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={control}
-        name="notes"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>הערות (אופציונלי)</FormLabel>
-            <FormControl>
-              <Textarea placeholder="הערות מיוחדות לגבי הסטודנט..." {...field} className="resize-none h-20" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-    </>
-  );
 
   const StudentDropdown = ({ student }: { student: Student }) => (
     <DropdownMenu>

@@ -363,6 +363,7 @@ export async function customFetch<T = unknown>(
   const response = await fetch(input, {
     credentials: "include",
     ...init,
+    cache: init.cache ?? (method === "GET" ? "no-store" : undefined),
     method,
     headers,
   });

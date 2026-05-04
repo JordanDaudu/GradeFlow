@@ -102,8 +102,10 @@ export default function CoursesPage() {
     },
   });
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["/api/courses"] });
+  const invalidate = () => {
+  queryClient.invalidateQueries({ queryKey: ["/api/courses"] });
+  queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
+};
 
   const filteredCourses = courses?.filter(c => {
     if (!showArchived && c.archived) return false;
