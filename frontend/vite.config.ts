@@ -31,21 +31,6 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [
           {
-            // Stale-while-revalidate for all GET API responses.
-            urlPattern: /\/api\/.*/i,
-            handler: "StaleWhileRevalidate",
-            options: {
-              cacheName: "gradeflow-api",
-              expiration: {
-                maxEntries: 60,
-                maxAgeSeconds: 60 * 60 * 24, // 24 h
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
-          {
             // Cache Google Fonts CSS.
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: "StaleWhileRevalidate",

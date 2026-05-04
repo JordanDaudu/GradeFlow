@@ -626,7 +626,9 @@ export default function GradingPage() {
       toast.success("הבדיקה נשמרה בהצלחה");
       setLastSavedAt(Date.now());
       queryClient.invalidateQueries({ queryKey: [`/api/submissions/${submissionId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/submissions/${submissionId}/rubric-scores`] });
       queryClient.invalidateQueries({ queryKey: [`/api/assignments/${assignmentId}/submissions`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/recent-submissions"] });
 
       if (andNext && nextSubmission) {
         navigateTo(nextSubmission.id);
