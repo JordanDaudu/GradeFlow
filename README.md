@@ -317,7 +317,10 @@ openssl rand -hex 64
 Windows PowerShell:
 
 ```powershell
-[Convert]::ToHexString((1..64 | ForEach-Object { Get-Random -Maximum 256 }))
+$bytes = New-Object byte[] 64
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+$jwtSecret = -join ($bytes | ForEach-Object { "{0:x2}" -f $_ })
+$jwtSecret
 ```
 
 Paste the generated value into:
