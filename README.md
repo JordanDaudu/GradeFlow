@@ -24,6 +24,7 @@ A focused grading workspace built for university teaching assistants and lecture
 16. [Testing](#testing)
 17. [Demo Accounts](#demo-accounts)
 18. [Development Workflow](#development-workflow)
+19. [Moodle Student Import](#moodle-student-import)
 
 ---
 
@@ -1327,3 +1328,217 @@ pnpm --filter @workspace/gradeflow build    # outputs to frontend/dist/
 ```bash
 docker compose up --build
 ```
+
+## Moodle Student Import
+
+GradeFlow includes a script for importing students from a Moodle participants CSV export.
+
+This is useful when you do not want to manually create students one by one.
+
+---
+
+### What the importer reads
+
+The importer expects a Moodle CSV with these Hebrew headers:
+
+```text
+שם פרטי
+שם משפחה
+מספר זיהוי
+דוא"ל
+```
+
+These fields are imported into GradeFlow as:
+
+```text
+שם פרטי      → firstName
+שם משפחה    → lastName
+מספר זיהוי  → externalId
+דוא"ל        → email
+```
+
+Other Moodle columns, such as academic year, department, campus, Hebrew year, and groups, are ignored.
+
+---
+
+### Export from Moodle
+
+From the Moodle participants page:
+
+1. Select the relevant participants.
+2. At the bottom export menu, choose CSV:
+
+```text
+תסדיר ערכים מופרדים בפסיק (csv)
+```
+
+3. Save the file into the local project folder:
+
+```text
+imports/
+```
+
+Example:
+
+```text
+imports/courseid_35716_participants.csv
+```
+
+The `imports/` folder is ignored by Git because it may contain real student data.
+
+---
+
+### Make sure Docker is running
+
+```bash
+docker compose up -d
+```
+
+The local PostgreSQL database is exposed on:
+
+```text
+127.0.0.1:5433
+```
+
+This allows local scripts to connect to the Docker database from your Mac/PC.
+
+---
+
+### Find the GradeFlow course ID
+
+Run:
+
+```bash
+docker compose exec db psql -U gradeflow -d gradeflow -c "select id, code, name, term, year from courses order by id;"
+```
+
+Use the correct `id` as `--course-id`.
+
+Example:
+
+```text
+ id | code |        name        | term | year
+----+------+--------------------+------+------
+  1 | 1    | מבוא למדעי המחשב  | סתיו | 2026
+```
+
+In this example, the course ID is:
+
+```text
+1
+```
+
+---
+
+### Dry run first
+
+Always run a dry run before changing the database:
+
+```bash
+./scripts/import-moodle-students.sh --file imports/courseid_35716_participants.csv --course-id 1 --dry-run
+```
+
+Expected output:
+
+```text
+Moodle student import
+=====================
+Database target: gradeflow@localhost:5433/gradeflow
+Parsed students: 8
+Skipped non-student rows: 0
+Invalid rows: 0
+Course ID: 1
+Dry run: yes
+
+Dry run complete. No database changes were made.
+```
+
+The dry run only parses and validates the CSV. It does not create, update, or enroll students.
+
+---
+
+### Run the real import
+
+After the dry run looks correct, run:
+
+```bash
+./scripts/import-moodle-students.sh --file imports/courseid_35716_participants.csv --course-id 1
+```
+
+The importer is safe to re-run:
+
+```text
+Existing students are updated.
+New students are created.
+Existing course enrollments are not duplicated.
+Students are enrolled into the selected course.
+Submission placeholders are created for existing assignments when needed.
+```
+
+Example output:
+
+```text
+Import completed successfully.
+Created students: 5
+Updated students: 3
+Enrolled students: 8
+Created submission placeholders: 0
+```
+
+---
+
+### Verify imported students
+
+Run:
+
+```bash
+docker compose exec db psql -U gradeflow -d gradeflow -c "select id, external_id, first_name, last_name, email from students order by id desc limit 20;"
+```
+
+Verify enrollments for a course:
+
+```bash
+docker compose exec db psql -U gradeflow -d gradeflow -c "select count(*) from enrollments where course_id = 1;"
+```
+
+Expected result after importing 8 students into course `1`:
+
+```text
+ count
+-------
+     8
+```
+
+---
+
+### Remote database import
+
+For a remote PostgreSQL database, override the database URL:
+
+```bash
+IMPORT_DATABASE_URL="postgresql://user:password@host:5432/database?sslmode=require" \
+./scripts/import-moodle-students.sh --file imports/courseid_35716_participants.csv --course-id 1 --dry-run
+```
+
+Then run without `--dry-run` when ready:
+
+```bash
+IMPORT_DATABASE_URL="postgresql://user:password@host:5432/database?sslmode=require" \
+./scripts/import-moodle-students.sh --file imports/courseid_35716_participants.csv --course-id 1
+```
+
+Be careful when importing into a remote database. Make sure the selected `--course-id` is correct before running the real import.
+
+---
+
+### Privacy note
+
+Do not commit Moodle CSV files to Git.
+
+The following folder is ignored:
+
+```text
+imports/
+```
+
+This is important because Moodle exports can contain real student names, IDs, and emails.
