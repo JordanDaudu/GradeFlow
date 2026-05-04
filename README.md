@@ -25,6 +25,7 @@ A focused grading workspace built for university teaching assistants and lecture
 17. [Demo Accounts](#demo-accounts)
 18. [Development Workflow](#development-workflow)
 19. [Moodle Student Import](#moodle-student-import)
+20. [Backup and Restore](docs/BACKUP_AND_RESTORE.md)
 
 ---
 
@@ -182,7 +183,14 @@ This means the same images can run on most Windows/Linux PCs, Intel/AMD servers,
 
 ## Option 1: Run from Published Docker Hub Images
 
-This option does **not** require building the project locally.
+This option does **not** require the full source code on the target computer.
+
+Use this when you want to run GradeFlow on another computer with only:
+
+```text
+docker-compose.yml
+.env
+```
 
 It pulls the already-published backend and frontend images from Docker Hub:
 
@@ -190,6 +198,17 @@ It pulls the already-published backend and frontend images from Docker Hub:
 jordandaudu/gradeflow-backend:latest
 jordandaudu/gradeflow-frontend:latest
 ```
+
+This image-based setup supports both database modes:
+
+```text
+Local mode  → uses the bundled PostgreSQL Docker container
+Remote mode → uses a remote PostgreSQL database such as Neon
+```
+
+If `DATABASE_URL` is not set to Neon, the app can still run locally with Docker PostgreSQL.
+
+---
 
 ### 1. Create a project folder
 
@@ -207,114 +226,74 @@ mkdir gradeflow
 cd gradeflow
 ```
 
-### 2. Create `docker-compose.yml`
+---
+
+### 2. Create `.env`
 
 Create a file named:
 
 ```text
-docker-compose.yml
+.env
 ```
 
-Paste the following content into it:
+Use this as a starting point:
 
-```yaml
-services:
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: gradeflow
-      POSTGRES_PASSWORD: gradeflow_password
-      POSTGRES_DB: gradeflow
-    ports:
-      - "5432:5432"
-    volumes:
-      - gradeflow_db:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gradeflow -d gradeflow"]
-      interval: 10s
-      timeout: 5s
-      retries: 6
+```env
+# ---------------------------------------------------------
+# GradeFlow runtime
+# ---------------------------------------------------------
+FRONTEND_PORT=3000
+FRONTEND_BASE_URL=http://localhost:3000
 
-  minio:
-    image: minio/minio:latest
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - gradeflow_minio:/data
-    healthcheck:
-      test: ["CMD-SHELL", "mc ready local || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 6
+# Use the same JWT_SECRET on every computer that connects
+# to the same remote database.
+JWT_SECRET=replace_this_with_a_long_random_secret
 
-  backend:
-    image: jordandaudu/gradeflow-backend:latest
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    environment:
-      NODE_ENV: production
-      PORT: 8080
+# ---------------------------------------------------------
+# Local PostgreSQL fallback
+# ---------------------------------------------------------
+POSTGRES_USER=gradeflow
+POSTGRES_PASSWORD=gradeflow_password
+POSTGRES_DB=gradeflow
+POSTGRES_PORT=5433
 
-      DATABASE_URL: postgresql://gradeflow:gradeflow_password@db:5432/gradeflow
+# Local Docker database URL.
+# Use this when you want the app to run fully locally.
+LOCAL_DATABASE_URL=postgresql://gradeflow:gradeflow_password@db:5432/gradeflow
 
-      JWT_SECRET: replace_this_with_a_long_random_secret
-      FRONTEND_BASE_URL: http://localhost:3000
+# Active backend database connection.
+# Local-only mode:
+DATABASE_URL=postgresql://gradeflow:gradeflow_password@db:5432/gradeflow
 
-      STORAGE_BACKEND: s3
-      S3_ENDPOINT: http://minio:9000
-      S3_PUBLIC_ENDPOINT: http://localhost:9000
-      S3_BUCKET: gradeflow
-      S3_ACCESS_KEY_ID: minioadmin
-      S3_SECRET_ACCESS_KEY: minioadmin
-      S3_FORCE_PATH_STYLE: "true"
+# Remote Neon mode:
+# Replace DATABASE_URL with the Neon pooled URL containing "-pooler".
+# DATABASE_URL=postgresql://USER:PASSWORD@HOST-pooler.REGION.neon.tech/neondb?sslmode=require&channel_binding=require
 
-      RESEND_API_KEY: ""
-      EMAIL_FROM: "GradeFlow <noreply@example.com>"
-    ports:
-      - "8080:8080"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fs http://localhost:8080/api/healthz | grep -q ok || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
+# Optional direct DB URL for restore/migrations/admin scripts.
+# For Neon, this should be the direct URL without "-pooler".
+DIRECT_DATABASE_URL=
 
-  frontend:
-    image: jordandaudu/gradeflow-frontend:latest
-    restart: unless-stopped
-    depends_on:
-      backend:
-        condition: service_healthy
-    ports:
-      - "3000:80"
+# ---------------------------------------------------------
+# MinIO / S3-compatible object storage
+# ---------------------------------------------------------
+MINIO_API_PORT=9000
+MINIO_CONSOLE_PORT=9001
 
-volumes:
-  gradeflow_db:
-    name: gradeflow_db
-  gradeflow_minio:
-    name: gradeflow_minio
+STORAGE_BACKEND=s3
+S3_BUCKET=gradeflow
+S3_REGION=us-east-1
+S3_ACCESS_KEY_ID=minioadmin
+S3_SECRET_ACCESS_KEY=minioadmin
+S3_PUBLIC_ENDPOINT=http://localhost:9000
+
+# ---------------------------------------------------------
+# Optional email provider
+# ---------------------------------------------------------
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=
 ```
 
-### 3. Generate a JWT secret
-
-Replace this value in the compose file:
-
-```text
-replace_this_with_a_long_random_secret
-```
-
-Generate a secure value:
+Generate a secure `JWT_SECRET` before running the app.
 
 macOS/Linux/Git Bash:
 
@@ -333,11 +312,190 @@ $jwtSecret
 
 Paste the generated value into:
 
-```yaml
-JWT_SECRET: your_generated_secret_here
+```env
+JWT_SECRET=your_generated_secret_here
 ```
 
-### 4. Pull and start the application
+Do not commit or publicly share `.env`.
+
+---
+
+### 3. Local database mode
+
+Use this mode when the computer should run GradeFlow fully locally.
+
+In `.env`, keep:
+
+```env
+DATABASE_URL=postgresql://gradeflow:gradeflow_password@db:5432/gradeflow
+DIRECT_DATABASE_URL=
+```
+
+This uses the bundled PostgreSQL container from Docker Compose.
+
+---
+
+### 4. Shared remote database mode with Neon
+
+Use this mode when two or more computers should share the same GradeFlow database.
+
+In `.env`, set:
+
+```env
+# Runtime database connection.
+# Use the Neon pooled connection string. It contains "-pooler".
+DATABASE_URL=postgresql://USER:PASSWORD@HOST-pooler.REGION.neon.tech/neondb?sslmode=require&channel_binding=require
+
+# Direct database connection.
+# Use the Neon direct connection string. It does not contain "-pooler".
+DIRECT_DATABASE_URL=postgresql://USER:PASSWORD@HOST.REGION.neon.tech/neondb?sslmode=require&channel_binding=require
+```
+
+Important:
+
+```text
+DATABASE_URL          pooled Neon URL, contains "-pooler"
+DIRECT_DATABASE_URL   direct Neon URL, does not contain "-pooler"
+JWT_SECRET            same value on every computer using the same remote DB
+```
+
+With this setup:
+
+```text
+Computer 1 Docker backend ─┐
+                           ├── same Neon PostgreSQL database
+Computer 2 Docker backend ─┘
+```
+
+The shared remote database includes:
+
+```text
+users
+courses
+students
+enrollments
+assignments
+submissions
+grades
+rubrics
+feedback templates
+```
+
+Important storage limitation:
+
+```text
+Uploaded files are not shared yet if each computer uses its own local MinIO.
+```
+
+If Computer 1 uploads a PDF, Computer 2 may see the database record but not the actual file unless both computers also use the same remote S3-compatible storage. For full multi-computer usage, configure remote object storage later.
+
+---
+
+### 5. Create `docker-compose.yml`
+
+Create a file named:
+
+```text
+docker-compose.yml
+```
+
+Paste the following content into it:
+
+```yaml
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gradeflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gradeflow_password}
+      POSTGRES_DB: ${POSTGRES_DB:-gradeflow}
+    volumes:
+      - gradeflow_db:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gradeflow} -d ${POSTGRES_DB:-gradeflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-minioadmin}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - gradeflow_minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  backend:
+    image: jordandaudu/gradeflow-backend:latest
+    restart: unless-stopped
+    environment:
+      PORT: 8080
+      NODE_ENV: production
+
+      # If DATABASE_URL is set in .env, Docker uses it.
+      # If it is missing, Docker falls back to the bundled local PostgreSQL service.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://gradeflow:gradeflow_password@db:5432/gradeflow}
+      DIRECT_DATABASE_URL: ${DIRECT_DATABASE_URL:-}
+
+      JWT_SECRET: ${JWT_SECRET}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:3000}
+
+      STORAGE_BACKEND: s3
+      S3_BUCKET: ${S3_BUCKET:-gradeflow}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-minioadmin}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-minioadmin}
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
+      S3_FORCE_PATH_STYLE: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/api/healthz | grep -q ok || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  frontend:
+    image: jordandaudu/gradeflow-frontend:latest
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  gradeflow_db:
+  gradeflow_minio:
+```
+
+This compose file intentionally keeps the `db` service available even when using Neon. That makes it easy to switch back to local mode by changing `DATABASE_URL`.
+
+---
+
+### 6. Pull and start the application
 
 macOS/Linux/Git Bash:
 
@@ -353,7 +511,34 @@ docker compose pull
 docker compose up -d
 ```
 
-### 5. Check that the containers are running
+---
+
+### 7. Check which database Docker will use
+
+Run:
+
+```bash
+docker compose config | grep -n "DATABASE_URL\|DIRECT_DATABASE_URL"
+```
+
+For local mode, you should see:
+
+```text
+DATABASE_URL: postgresql://gradeflow:gradeflow_password@db:5432/gradeflow
+```
+
+For Neon mode, you should see:
+
+```text
+DATABASE_URL: postgresql://...-pooler...neon.tech/neondb...
+DIRECT_DATABASE_URL: postgresql://...neon.tech/neondb...
+```
+
+If you expected Neon but see `db:5432`, then `.env` is still pointing to the local database.
+
+---
+
+### 8. Check that the containers are running
 
 ```bash
 docker compose ps
@@ -368,7 +553,9 @@ backend
 frontend
 ```
 
-### 6. Verify backend health
+---
+
+### 9. Verify backend health
 
 macOS/Linux/Git Bash:
 
@@ -390,7 +577,9 @@ Expected response:
 }
 ```
 
-### 7. Open the app
+---
+
+### 10. Open the app
 
 Open this URL in your browser:
 
@@ -407,9 +596,11 @@ Swagger Docs:  http://localhost:3000/api/docs
 MinIO Console: http://localhost:9001
 ```
 
-### 8. Default seeded users
+---
 
-On first startup, if the database has no users, the backend seeds default accounts:
+### 11. Default seeded users
+
+On first startup, if the selected database has no users, the backend seeds default accounts:
 
 ```text
 Admin:    admin@gradeflow.app    / admin123
@@ -474,8 +665,11 @@ For local Docker, the important environment values are:
 POSTGRES_USER=gradeflow
 POSTGRES_PASSWORD=gradeflow_password
 POSTGRES_DB=gradeflow
+POSTGRES_PORT=5433
 
 DATABASE_URL=postgresql://gradeflow:gradeflow_password@db:5432/gradeflow
+DIRECT_DATABASE_URL=
+LOCAL_DATABASE_URL=postgresql://gradeflow:gradeflow_password@db:5432/gradeflow
 
 FRONTEND_BASE_URL=http://localhost:3000
 
@@ -501,6 +695,25 @@ For local Docker, this is why:
 S3_ENDPOINT=http://minio:9000
 S3_PUBLIC_ENDPOINT=http://localhost:9000
 ```
+
+### Optional: use the same remote PostgreSQL database from source mode
+
+To run the source-code Docker setup against a shared Neon database, change `.env`:
+
+```env
+DATABASE_URL=postgresql://USER:PASSWORD@HOST-pooler.REGION.neon.tech/neondb?sslmode=require&channel_binding=require
+DIRECT_DATABASE_URL=postgresql://USER:PASSWORD@HOST.REGION.neon.tech/neondb?sslmode=require&channel_binding=require
+LOCAL_DATABASE_URL=postgresql://gradeflow:gradeflow_password@db:5432/gradeflow
+```
+
+To return to local mode later, set:
+
+```env
+DATABASE_URL=postgresql://gradeflow:gradeflow_password@db:5432/gradeflow
+DIRECT_DATABASE_URL=
+```
+
+---
 
 ### 4. Build and start the full stack
 
@@ -573,7 +786,7 @@ MinIO Console: http://localhost:9001
 
 ### 8. Default seeded users
 
-On first startup, if the database has no users, the backend seeds default accounts:
+On first startup, if the selected database has no users, the backend seeds default accounts:
 
 ```text
 Admin:    admin@gradeflow.app    / admin123
@@ -659,10 +872,13 @@ This makes them portable across most modern Docker environments.
 
 - PostgreSQL stores GradeFlow relational data.
 - MinIO provides local S3-compatible object storage for uploaded assignment/submission files.
+- A remote database such as Neon shares relational data between computers.
+- Local MinIO does not share uploaded files between computers. Use remote S3-compatible storage for shared uploaded files.
 - The backend automatically applies Prisma migrations on container startup.
 - The backend seeds default users only when no users exist.
 - The frontend is served by Nginx and proxies `/api/*` requests to the backend.
 - `.env` should never be committed to Git.
+- Full local backup/restore documentation is available in [`docs/BACKUP_AND_RESTORE.md`](docs/BACKUP_AND_RESTORE.md).
 
 ---
 
@@ -708,7 +924,9 @@ Open the URL printed by Vite. API docs are at `http://localhost:<PORT>/api/docs`
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `PORT` | Yes | Port the NestJS server binds to |
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `DATABASE_URL` | Yes | PostgreSQL connection string used by the running backend. For local Docker, use `db:5432`. For Neon, use the pooled URL containing `-pooler`. |
+| `DIRECT_DATABASE_URL` | No | Direct PostgreSQL connection string used for restore, migration, or admin scripts. For Neon, use the non-pooled URL without `-pooler`. |
+| `LOCAL_DATABASE_URL` | No | Optional local Docker PostgreSQL URL kept as a reference when switching between remote and local database modes. |
 | `JWT_SECRET` | Yes (prod) | Secret used to sign session JWTs |
 | `NODE_ENV` | No | `production` enables secure cookies and stricter behaviour |
 | `STORAGE_BACKEND` | No | `replit` (default) or `s3` |
@@ -735,6 +953,69 @@ In the Replit environment the API is co-located, so no additional variables are 
 ## Database
 
 GradeFlow uses **Prisma** for all database access. All schema changes go through committed migration SQL files.
+
+### Local Docker PostgreSQL mode
+
+By default, Docker Compose runs a bundled PostgreSQL 16 container and the backend connects to it through Docker networking:
+
+```env
+DATABASE_URL=postgresql://gradeflow:gradeflow_password@db:5432/gradeflow
+DIRECT_DATABASE_URL=
+```
+
+This mode is best for local-only development, demos, and isolated testing.
+
+### Remote PostgreSQL / Neon mode
+
+GradeFlow can also use a remote PostgreSQL database instead of the local Docker PostgreSQL service.
+
+This is useful when multiple computers should share the same GradeFlow relational data.
+
+For Neon, use two connection strings:
+
+```text
+DATABASE_URL          Pooled Neon URL, contains `-pooler`
+DIRECT_DATABASE_URL   Direct Neon URL, does not contain `-pooler`
+```
+
+Example `.env` structure:
+
+```env
+# Remote Neon database used by the running backend
+DATABASE_URL="postgresql://USER:PASSWORD@HOST-pooler.REGION.neon.tech/neondb?sslmode=require&channel_binding=require"
+
+# Direct Neon database connection for restore, migrations, or admin scripts
+DIRECT_DATABASE_URL="postgresql://USER:PASSWORD@HOST.REGION.neon.tech/neondb?sslmode=require&channel_binding=require"
+
+# Optional local Docker fallback/reference
+LOCAL_DATABASE_URL="postgresql://gradeflow:gradeflow_password@db:5432/gradeflow"
+```
+
+Important:
+
+```text
+DATABASE_URL should use the pooled Neon connection.
+DIRECT_DATABASE_URL should use the direct Neon connection.
+JWT_SECRET should be the same on every computer using the same shared database.
+.env must never be committed.
+```
+
+To verify which database Docker Compose will use:
+
+```bash
+docker compose config | grep -n "DATABASE_URL\|DIRECT_DATABASE_URL"
+```
+
+For local Docker PostgreSQL mode, set:
+
+```env
+DATABASE_URL="postgresql://gradeflow:gradeflow_password@db:5432/gradeflow"
+DIRECT_DATABASE_URL=
+```
+
+For remote Neon mode, set `DATABASE_URL` to the pooled Neon URL.
+
+Note: using a remote PostgreSQL database shares GradeFlow relational data such as users, courses, students, assignments, grades, and feedback. Uploaded files are still stored in MinIO unless remote S3-compatible storage is configured.
 
 ### Create a new migration (development)
 
