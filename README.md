@@ -83,7 +83,8 @@ GradeFlow ships a [Web App Manifest](frontend/public/manifest.webmanifest) that 
 | Background colour | `#0f1923` (dark) |
 | Icons | 192 × 192 px and 512 × 512 px PNG |
 
-> A service worker for offline support is not included. The install prompt and home-screen icon work without one.
+> The production build registers a service worker through `vite-plugin-pwa`.
+> GradeFlow includes an offline page, cached static assets, and a refresh prompt when a new version is available.
 
 ---
 
