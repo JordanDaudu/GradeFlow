@@ -68,4 +68,5 @@ replit.nix
 # Import / Temporary Folders
 # =========================================================
 imports/
-**/imports/
+**/imports/backups/
+**/backups/
