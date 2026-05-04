@@ -281,6 +281,12 @@ services:
       EMAIL_FROM: "GradeFlow <noreply@example.com>"
     ports:
       - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/api/healthz | grep -q ok || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   frontend:
     image: jordandaudu/gradeflow-frontend:latest
