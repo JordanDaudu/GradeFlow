@@ -665,7 +665,7 @@ export default function GradingPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/recent-submissions"] });
 
       if (andNext && nextSubmission) {
-        navigateTo(nextSubmission.id);
+        setLocation(`/assignments/${assignmentId}/grade/${nextSubmission.id}`);
       }
     } catch (error) {
       toast.error("אירעה שגיאה בשמירת הבדיקה");
