@@ -88,6 +88,15 @@ import {
   validateUploadFile,
 } from "@/lib/assignment-files";
 
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
+  pending:      { label: 'לא נבדק',          color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/30',   icon: '⏳' },
+  in_progress:  { label: 'בתהליך',           color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/30',        icon: '✏️' },
+  needs_review: { label: 'דורש בדיקה חוזרת', color: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800/30', icon: '🔁' },
+  graded:       { label: 'נבדק',             color: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800/30',   icon: '✓' },
+  returned:     { label: 'הוחזר',            color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800/30', icon: '↩️' },
+  missing:      { label: 'חסר הגשה',         color: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/30',             icon: '✕' },
+};
+
 const FILE_TYPE_LABELS: Record<string, string> = {
   instructions: "הנחיות",
   grading_guide: "מחוון בדיקה (PDF)",
@@ -377,7 +386,8 @@ export default function AssignmentDetailPage() {
     (s.student?.externalId && s.student.externalId.includes(searchQuery))
   );
 
-  const gradedCount = submissions?.filter(s => s.status === 'graded').length || 0;
+  const DONE_STATUSES = new Set(['graded', 'returned', 'missing', 'needs_review']);
+  const gradedCount = submissions?.filter(s => DONE_STATUSES.has(s.status ?? '')).length || 0;
   const totalCount = submissions?.length || 0;
   const progressPercent = totalCount > 0 ? Math.round((gradedCount / totalCount) * 100) : 0;
 
@@ -576,7 +586,8 @@ export default function AssignmentDetailPage() {
                     ))
                   ) : filteredSubmissions && filteredSubmissions.length > 0 ? (
                     filteredSubmissions.map((sub, i) => {
-                      const isGraded = sub.status === 'graded';
+                      const statusKey = sub.status ?? 'pending';
+                      const statusCfg = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG['pending'];
                       
                       return (
                         <motion.tr 
@@ -594,18 +605,12 @@ export default function AssignmentDetailPage() {
                             {sub.student?.firstName} {sub.student?.lastName}
                           </TableCell>
                           <TableCell>
-                            <Badge 
-                              variant="outline" 
-                              className={`gap-1.5 ${isGraded 
-                                ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800/30' 
-                                : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/30'}`}
-                            >
-                              {isGraded ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                              {isGraded ? 'נבדק' : 'ממתין לבדיקה'}
+                            <Badge variant="outline" className={`gap-1.5 ${statusCfg.color}`}>
+                              {statusCfg.label}
                             </Badge>
                           </TableCell>
                           <TableCell className="font-semibold text-lg">
-                            {isGraded && sub.score !== null ? sub.score : '-'}
+                            {statusKey === 'graded' && sub.score !== null ? sub.score : '-'}
                           </TableCell>
                           <TableCell className="text-muted-foreground truncate max-w-[200px]">
                             {sub.feedback ? (
@@ -615,12 +620,12 @@ export default function AssignmentDetailPage() {
                             )}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button 
+                            <Button   
                               size="sm"
-                              variant={isGraded ? "outline" : "default"}
+                              variant={statusKey === 'graded' ? "outline" : "default"}
                               className="w-full text-xs h-8"
                             >
-                              {isGraded ? "ערוך בדיקה" : "התחל לבדוק"}
+                                {statusKey === 'graded' ? "ערוך בדיקה" : "התחל לבדוק"}
                             </Button>
                           </TableCell>
                         </motion.tr>
@@ -653,7 +658,8 @@ export default function AssignmentDetailPage() {
                 ))
               ) : filteredSubmissions && filteredSubmissions.length > 0 ? (
                 filteredSubmissions.map((sub, i) => {
-                  const isGraded = sub.status === 'graded';
+                  const statusKey = sub.status ?? 'pending';
+                  const statusCfg = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG['pending'];
                   return (
                     <motion.button
                       key={sub.id}
@@ -674,28 +680,22 @@ export default function AssignmentDetailPage() {
                             {sub.student?.externalId}
                           </div>
                         </div>
-                        <Badge
-                          variant="outline"
-                          className={`gap-1.5 shrink-0 ${isGraded 
-                            ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800/30' 
-                            : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/30'}`}
-                        >
-                          {isGraded ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                          {isGraded ? 'נבדק' : 'ממתין'}
+                        <Badge variant="outline" className={`gap-1.5 shrink-0 ${statusCfg.color}`}>
+                          {statusCfg.label}
                         </Badge>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <div>
                           <span className="text-muted-foreground">ציון: </span>
                           <span className="font-semibold">
-                            {isGraded && sub.score !== null ? sub.score : '—'}
+                            {statusKey === 'graded' && sub.score !== null ? sub.score : '—'}
                           </span>
                           {assignment?.maxScore && (
                             <span className="text-muted-foreground"> / {assignment.maxScore}</span>
                           )}
                         </div>
                         <span className="text-primary text-xs font-medium">
-                          {isGraded ? "ערוך בדיקה" : "התחל לבדוק"}
+                          {statusKey === 'graded' ? "ערוך בדיקה" : "התחל לבדוק"}
                           <ChevronRight className="inline h-3.5 w-3.5 -mt-px rtl:rotate-180" />
                         </span>
                       </div>
