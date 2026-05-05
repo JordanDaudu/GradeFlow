@@ -506,6 +506,24 @@ export default function GradingPage() {
     setLastSavedAt(null);
   }, [submissionId]);
 
+  // Track the last-saved snapshot to detect unsaved changes
+  const savedSnapshot = useRef<string>("");
+  const currentSnapshot = JSON.stringify({ feedback, privateNotes, submissionStatus, originalityFlag, submittedLate, scores });
+  const isDirty = savedSnapshot.current !== "" && savedSnapshot.current !== currentSnapshot;
+
+
+  // Warn on browser reload / tab close when there are unsaved changes
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
   // Ref to keep handleSave fresh inside the keyboard listener
   const handleSaveRef = useRef<(andNext?: boolean) => Promise<void>>(async () => {});
 
@@ -520,6 +538,20 @@ export default function GradingPage() {
       setSubmittedLate(Boolean((submission as { submittedLate?: boolean }).submittedLate));
     }
   }, [submission]);
+
+  // Update snapshot after data has loaded so isDirty starts false
+  useEffect(() => {
+    if (submission) {
+      savedSnapshot.current = JSON.stringify({
+        feedback: submission.feedback || "",
+        privateNotes: (submission as { privateNotes?: string | null }).privateNotes ?? "",
+        submissionStatus: (submission.status as SubmissionStatus) ?? "pending",
+        originalityFlag: Boolean((submission as { originalityFlag?: boolean }).originalityFlag),
+        submittedLate: Boolean((submission as { submittedLate?: boolean }).submittedLate),
+        scores,
+      });
+    }
+  }, [submission?.id]);
 
   useEffect(() => {
     if (rubricScores && rubricScores.length > 0) {
@@ -585,6 +617,7 @@ export default function GradingPage() {
     : null;
 
   const navigateTo = (newSubId: number) => {
+    if (isDirty && !window.confirm("יש שינויים שלא נשמרו. האם לעזוב בלי לשמור?")) return;
     setLocation(`/assignments/${assignmentId}/grade/${newSubId}`);
   };
 
@@ -625,6 +658,7 @@ export default function GradingPage() {
 
       toast.success("הבדיקה נשמרה בהצלחה");
       setLastSavedAt(Date.now());
+      savedSnapshot.current = currentSnapshot;
       queryClient.invalidateQueries({ queryKey: [`/api/submissions/${submissionId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/submissions/${submissionId}/rubric-scores`] });
       queryClient.invalidateQueries({ queryKey: [`/api/assignments/${assignmentId}/submissions`] });
@@ -749,7 +783,7 @@ export default function GradingPage() {
       {/* Top Navbar */}
       <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4 shrink-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => setLocation(`/assignments/${assignmentId}`)} className="gap-1.5 -mr-2 text-muted-foreground hover:text-foreground">
+          <Button variant="ghost" size="sm" onClick={() => { if (isDirty && !window.confirm("יש שינויים שלא נשמרו. האם לעזוב בלי לשמור?")) return; setLocation(`/assignments/${assignmentId}`); }} className="gap-1.5 -mr-2 text-muted-foreground hover:text-foreground">
             <ChevronRight className="h-4 w-4" />
             <span className="hidden sm:inline">חזור למטלה</span>
           </Button>
@@ -1257,6 +1291,7 @@ export default function GradingPage() {
                 <Textarea 
                   placeholder="הקלד משוב לסטודנט כאן..." 
                   className="min-h-[150px] resize-none bg-background leading-relaxed"
+                  dir="auto"
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
                 />
@@ -1308,6 +1343,7 @@ export default function GradingPage() {
                 <Textarea
                   placeholder="הערות אישיות לבודק בלבד..."
                   className="min-h-[100px] resize-none bg-amber-50/40 dark:bg-amber-950/10 leading-relaxed border-amber-200/60"
+                  dir="auto"
                   value={privateNotes}
                   onChange={(e) => setPrivateNotes(e.target.value)}
                   data-testid="textarea-private-notes"
