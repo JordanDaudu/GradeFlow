@@ -610,7 +610,7 @@ export default function AssignmentDetailPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="font-semibold text-lg">
-                            {statusKey === 'graded' && sub.score !== null ? sub.score : '-'}
+                            {DONE_STATUSES.has(statusKey) && sub.score !== null ? sub.score : '-'}
                           </TableCell>
                           <TableCell className="text-muted-foreground truncate max-w-[200px]">
                             {sub.feedback ? (
@@ -625,7 +625,7 @@ export default function AssignmentDetailPage() {
                               variant={statusKey === 'graded' ? "outline" : "default"}
                               className="w-full text-xs h-8"
                             >
-                                {statusKey === 'graded' ? "ערוך בדיקה" : "התחל לבדוק"}
+                                {DONE_STATUSES.has(statusKey) ? "ערוך בדיקה" : "התחל לבדוק"}
                             </Button>
                           </TableCell>
                         </motion.tr>
@@ -688,14 +688,14 @@ export default function AssignmentDetailPage() {
                         <div>
                           <span className="text-muted-foreground">ציון: </span>
                           <span className="font-semibold">
-                            {statusKey === 'graded' && sub.score !== null ? sub.score : '—'}
+                            {DONE_STATUSES.has(statusKey) && sub.score !== null ? sub.score : '—'}
                           </span>
                           {assignment?.maxScore && (
                             <span className="text-muted-foreground"> / {assignment.maxScore}</span>
                           )}
                         </div>
                         <span className="text-primary text-xs font-medium">
-                          {statusKey === 'graded' ? "ערוך בדיקה" : "התחל לבדוק"}
+                          {DONE_STATUSES.has(statusKey) ? "ערוך בדיקה" : "התחל לבדוק"}
                           <ChevronRight className="inline h-3.5 w-3.5 -mt-px rtl:rotate-180" />
                         </span>
                       </div>
