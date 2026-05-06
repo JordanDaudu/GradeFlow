@@ -38,7 +38,9 @@ export class AssignmentsService {
           },
         },
         submissions: {
-          where: { status: { in: ['graded', 'returned'] } },
+          // Count only statuses that are complete from the assignment-card perspective.
+          // needs_review is intentionally excluded because it still requires grader action.
+          where: { status: { in: ['graded', 'returned', 'missing'] } },
           select: { id: true },
         },
       },

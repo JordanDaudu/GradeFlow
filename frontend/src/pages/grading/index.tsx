@@ -648,9 +648,9 @@ export default function GradingPage() {
         submissionId,
         data: {
           status: finalStatus,
-          score: finalStatus === "missing" ? null : computedScore,
-          feedback: feedback || undefined,
-          privateNotes: privateNotes || undefined,
+          score: computedScore,
+          feedback: feedback.trim() === "" ? null : feedback,
+          privateNotes: privateNotes.trim() === "" ? null : privateNotes,
           originalityFlag,
           submittedLate,
         },

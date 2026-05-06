@@ -5,7 +5,6 @@ import {
   BookOpen,
   Users,
   FileText,
-  CheckCircle2,
   Clock,
   ArrowLeft,
   PartyPopper,
@@ -24,6 +23,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 const PENDING_STATUSES = new Set(["pending", "in_progress", "needs_review"]);
+
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
+  pending:      { label: 'לא נבדק',          color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/30',   icon: '⏳' },
+  in_progress:  { label: 'בתהליך',           color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/30',        icon: '✏️' },
+  needs_review: { label: 'דורש בדיקה חוזרת', color: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800/30', icon: '🔁' },
+  graded:       { label: 'נבדק',             color: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800/30',   icon: '✓' },
+  returned:     { label: 'הוחזר',            color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800/30', icon: '↩️' },
+  missing:      { label: 'חסר הגשה',         color: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/30',             icon: '✕' },
+};
 
 function formatHebrewDate(value: string | Date) {
   const d = typeof value === "string" ? new Date(value) : value;
@@ -111,7 +119,8 @@ export default function DashboardPage() {
       (breakdown.in_progress ?? 0) +
       (breakdown.needs_review ?? 0) +
       (breakdown.graded ?? 0) +
-      (breakdown.returned ?? 0)
+      (breakdown.returned ?? 0) +
+      (breakdown.missing ?? 0)
     : 0;
 
   return (
@@ -286,7 +295,11 @@ export default function DashboardPage() {
             ) : recent && recent.length > 0 ? (
               <ul className="divide-y divide-border/60">
                 {recent.slice(0, 6).map((sub, i) => {
-                  const isPending = PENDING_STATUSES.has(sub.status);
+                  const statusCfg = STATUS_CONFIG[sub.status] ?? STATUS_CONFIG.pending;
+                  const shouldShowScore =
+                    sub.status !== "missing" &&
+                    sub.score !== null &&
+                    sub.score !== undefined;
                   const href = `/assignments/${sub.assignmentId}/grade/${sub.id}`;
                   return (
                     <motion.li
@@ -301,17 +314,10 @@ export default function DashboardPage() {
                           data-testid={`recent-submission-${sub.id}`}
                         >
                           <div
-                            className={`mt-0.5 p-2 rounded-full shrink-0 ${
-                              isPending
-                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                                : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                            }`}
+                            className={`mt-0.5 h-8 w-8 rounded-full border flex items-center justify-center shrink-0 text-xs font-semibold ${statusCfg.color}`}
+                            title={statusCfg.label}
                           >
-                            {isPending ? (
-                              <Clock className="h-3.5 w-3.5" />
-                            ) : (
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                            )}
+                            <span aria-hidden="true">{statusCfg.icon}</span>
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2">
@@ -326,10 +332,17 @@ export default function DashboardPage() {
                               <p className="text-xs text-muted-foreground truncate">
                                 {sub.assignmentName} · {sub.courseName}
                               </p>
-                              {!isPending && sub.score !== null && sub.score !== undefined && (
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] h-5 px-1.5 font-medium border shrink-0 gap-1 ${statusCfg.color}`}
+                              >
+                                <span aria-hidden="true">{statusCfg.icon}</span>
+                                {statusCfg.label}
+                              </Badge>
+                              {shouldShowScore && (
                                 <Badge
                                   variant="outline"
-                                  className="text-[10px] h-5 px-1.5 font-medium bg-emerald-500/10 text-emerald-700 border-emerald-200 dark:text-emerald-400 dark:border-emerald-900/40 shrink-0"
+                                  className="text-[10px] h-5 px-1.5 font-medium bg-muted/40 text-muted-foreground border-border shrink-0"
                                 >
                                   ציון: {sub.score}
                                 </Badge>
@@ -387,11 +400,20 @@ export default function DashboardPage() {
                       )}
                       {(breakdown.returned ?? 0) > 0 && (
                         <div
-                          className="h-full bg-blue-500"
+                          className="h-full bg-purple-500"
                           style={{
                             width: `${((breakdown.returned ?? 0) / totalForBar) * 100}%`,
                           }}
                           title={`הוחזר: ${breakdown.returned}`}
+                        />
+                      )}
+                      {(breakdown.missing ?? 0) > 0 && (
+                        <div
+                          className="h-full bg-red-500"
+                          style={{
+                            width: `${((breakdown.missing ?? 0) / totalForBar) * 100}%`,
+                          }}
+                          title={`חסר הגשה: ${breakdown.missing}`}
                         />
                       )}
                       {(breakdown.in_progress ?? 0) > 0 && (
@@ -433,7 +455,7 @@ export default function DashboardPage() {
                     value={breakdown?.pending ?? 0}
                   />
                   <BreakdownRow
-                    color="bg-amber-400"
+                    color="bg-blue-500"
                     label="בתהליך"
                     value={breakdown?.in_progress ?? 0}
                   />
@@ -448,9 +470,14 @@ export default function DashboardPage() {
                     value={breakdown?.graded ?? 0}
                   />
                   <BreakdownRow
-                    color="bg-blue-500"
+                    color="bg-purple-500"
                     label="הוחזר לתיקון"
                     value={breakdown?.returned ?? 0}
+                  />
+                  <BreakdownRow
+                    color="bg-red-500"
+                    label="חסר הגשה"
+                    value={breakdown?.missing ?? 0}
                   />
                 </ul>
 

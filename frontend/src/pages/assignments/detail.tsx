@@ -386,7 +386,7 @@ export default function AssignmentDetailPage() {
     (s.student?.externalId && s.student.externalId.includes(searchQuery))
   );
 
-  const DONE_STATUSES = new Set(['graded', 'returned', 'missing', 'needs_review']);
+  const DONE_STATUSES = new Set(['graded', 'returned', 'missing']);
   const gradedCount = submissions?.filter(s => DONE_STATUSES.has(s.status ?? '')).length || 0;
   const totalCount = submissions?.length || 0;
   const progressPercent = totalCount > 0 ? Math.round((gradedCount / totalCount) * 100) : 0;
@@ -622,7 +622,7 @@ export default function AssignmentDetailPage() {
                           <TableCell className="text-right">
                             <Button   
                               size="sm"
-                              variant={statusKey === 'graded' ? "outline" : "default"}
+                              variant={DONE_STATUSES.has(statusKey) ? "outline" : "default"}
                               className="w-full text-xs h-8"
                             >
                                 {DONE_STATUSES.has(statusKey) ? "ערוך בדיקה" : "התחל לבדוק"}
