@@ -1,6 +1,21 @@
-# GradeFlow
+<p align="center">
+  <img src="assets/GradeFlow-Banner.png" alt="GradeFlow GitHub README hero banner" width="100%" />
+</p>
 
-A focused grading workspace built for university teaching assistants and lecturers. GradeFlow supports Hebrew RTL out-of-the-box and provides a calm, functional environment for grading assignments, managing course rosters, and maintaining reusable feedback templates.
+<h1 align="center">GradeFlow</h1>
+
+<p align="center">
+  AI-assisted grading workflow platform for university teaching assistants and lecturers.
+</p>
+
+<p align="center">
+  <strong>Hebrew RTL</strong> · <strong>Rubric-based grading</strong> · <strong>PDF/DOCX preview</strong> · <strong>Docker-ready</strong> · <strong>Cloud-ready</strong>
+</p>
+
+---
+
+GradeFlow is a focused grading workspace built for university teaching assistants and lecturers.  
+It supports Hebrew RTL out-of-the-box and provides a calm, functional environment for grading assignments, managing course rosters, reviewing submissions, and maintaining reusable feedback templates.
 
 ---
 
@@ -11,21 +26,20 @@ A focused grading workspace built for university teaching assistants and lecture
 3. [Tech Stack](#tech-stack)
 4. [Architecture Overview](#architecture-overview)
 5. [Universal Docker Run Options](#universal-docker-run-options)
-6. [Running in Development (Replit)](#running-in-development-replit)
-7. [Environment Variables](#environment-variables)
-8. [Database](#database)
-9. [File Storage](#file-storage)
-10. [API Documentation (Swagger)](#api-documentation-swagger)
-11. [Project Structure](#project-structure)
-12. [Frontend Routes](#frontend-routes)
-13. [API Reference](#api-reference)
-14. [Authentication & Authorization](#authentication--authorization)
-15. [Data Models](#data-models)
-16. [Testing](#testing)
-17. [Demo Accounts](#demo-accounts)
-18. [Development Workflow](#development-workflow)
-19. [Moodle Student Import](#moodle-student-import)
-20. [Backup and Restore](docs/BACKUP_AND_RESTORE.md)
+6. [Environment Variables](#environment-variables)
+7. [Database](#database)
+8. [File Storage](#file-storage)
+9. [API Documentation (Swagger)](#api-documentation-swagger)
+10. [Project Structure](#project-structure)
+11. [Frontend Routes](#frontend-routes)
+12. [API Reference](#api-reference)
+13. [Authentication & Authorization](#authentication--authorization)
+14. [Data Models](#data-models)
+15. [Testing](#testing)
+16. [Demo Accounts](#demo-accounts)
+17. [Development Workflow](#development-workflow)
+18. [Moodle Student Import](#moodle-student-import)
+19. [Backup and Restore](docs/BACKUP_AND_RESTORE.md)
 
 ---
 
@@ -100,7 +114,7 @@ GradeFlow ships a [Web App Manifest](frontend/public/manifest.webmanifest) that 
 | **ORM** | Prisma 5 |
 | **Database** | PostgreSQL 16 |
 | **Auth** | Passport.js + JWT (httpOnly cookie, 30-day TTL) |
-| **File storage** | MinIO / AWS S3 (Docker) · Replit Object Storage (Replit) |
+| **File storage** | MinIO / AWS S3-compatible object storage |
 | **Email** | Resend (optional — for password reset) |
 | **API docs** | Swagger / OpenAPI via `@nestjs/swagger` |
 | **Validation** | class-validator + class-transformer |
@@ -112,6 +126,26 @@ GradeFlow ships a [Web App Manifest](frontend/public/manifest.webmanifest) that 
 ---
 
 ## Architecture Overview
+
+GradeFlow supports both a local Docker-based development environment and a cloud production deployment using managed services.
+
+### Local Docker Architecture
+
+<p align="center">
+  <img src="assets/GradeFlow-Local-Docker-Architecture.png" alt="GradeFlow local Docker architecture with frontend, backend, PostgreSQL, and MinIO" width="100%" />
+</p>
+
+The local setup uses Docker Compose to run the frontend, backend, PostgreSQL database, and MinIO object storage as separate containers.
+
+### Cloud Production Architecture
+
+<p align="center">
+  <img src="assets/GradeFlow-Cloud-Production-Architecture.png" alt="GradeFlow cloud production architecture with Render, Neon PostgreSQL, and AWS S3" width="100%" />
+</p>
+
+The production setup separates the hosted frontend, hosted backend, managed PostgreSQL database, and S3-compatible file storage.
+
+### Logical Application Flow
 
 ```
 ┌───────────────────────────────────────────────────────────┐
@@ -141,10 +175,8 @@ GradeFlow ships a [Web App Manifest](frontend/public/manifest.webmanifest) that 
                      ▼                  ▼
              PostgreSQL DB      Object Storage
              (via Prisma)       ┌─────────────────────┐
-                                │  STORAGE_BACKEND env │
-                                │  "replit" → Replit   │
-                                │  "s3"    → MinIO /   │
-                                │            AWS S3    │
+                                │ MinIO / AWS S3      │
+                                │ S3-compatible API   │
                                 └─────────────────────┘
 ```
 
@@ -156,7 +188,7 @@ GradeFlow ships a [Web App Manifest](frontend/public/manifest.webmanifest) that 
 | Token versioning (`User.tokenVersion`) | Changing a password or revoking sessions instantly invalidates all outstanding JWTs without a token blacklist. |
 | Error envelope `{ "error": string }` | `AllExceptionsFilter` normalises every error type so the frontend handles exactly one shape. |
 | Orval codegen for the API client | Types stay in sync with the OpenAPI spec automatically — no hand-written fetch calls. |
-| Pluggable storage backend | `ObjectStorageService` delegates to `ReplitStorageBackend` or `S3StorageBackend` based on `STORAGE_BACKEND`, so the same codebase works on Replit and in Docker without changes. |
+| S3-compatible storage backend | `ObjectStorageService` delegates file operations to an S3-compatible storage layer, allowing GradeFlow to use local MinIO in Docker or remote AWS S3-compatible storage in production. |
 | `setGlobalPrefix('api')` | Keeps API routes cleanly separated from the Vite-served static files. |
 
 ---
@@ -882,41 +914,6 @@ This makes them portable across most modern Docker environments.
 
 ---
 
-## Running in Development (Replit)
-
-On Replit, file storage uses Replit Object Storage automatically (`STORAGE_BACKEND=replit`). No Docker or MinIO needed.
-
-### Prerequisites
-
-- Node.js ≥ 20
-- pnpm ≥ 9
-- PostgreSQL database (`DATABASE_URL` must be set)
-- Replit Object Storage bucket (set the `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PRIVATE_OBJECT_DIR`, and `PUBLIC_OBJECT_SEARCH_PATHS` Replit Secrets)
-
-### Setup
-
-```bash
-# 1. Install all workspace dependencies
-pnpm install
-
-# 2. Apply database migrations
-pnpm --filter @workspace/api-server run prisma:migrate:deploy
-
-# 3. Seed demo data (first time only)
-pnpm --filter @workspace/api-server run prisma:seed
-
-# 4. Start both services
-# Terminal 1 — NestJS backend
-pnpm --filter @workspace/api-server run dev
-
-# Terminal 2 — Vite frontend
-pnpm --filter @workspace/gradeflow run dev
-```
-
-Open the URL printed by Vite. API docs are at `http://localhost:<PORT>/api/docs`.
-
----
-
 ## Environment Variables
 
 ### Backend — full reference
@@ -929,10 +926,7 @@ Open the URL printed by Vite. API docs are at `http://localhost:<PORT>/api/docs`
 | `LOCAL_DATABASE_URL` | No | Optional local Docker PostgreSQL URL kept as a reference when switching between remote and local database modes. |
 | `JWT_SECRET` | Yes (prod) | Secret used to sign session JWTs |
 | `NODE_ENV` | No | `production` enables secure cookies and stricter behaviour |
-| `STORAGE_BACKEND` | No | `replit` (default) or `s3` |
-| `DEFAULT_OBJECT_STORAGE_BUCKET_ID` | Replit only | Replit Object Storage bucket ID |
-| `PRIVATE_OBJECT_DIR` | Replit only | Private storage directory prefix |
-| `PUBLIC_OBJECT_SEARCH_PATHS` | Replit only | Comma-separated public path prefixes |
+| `STORAGE_BACKEND` | No | Storage backend. Use `s3` for MinIO or AWS S3-compatible storage. |
 | `S3_BUCKET` | S3 mode | Bucket name |
 | `S3_REGION` | S3 mode | AWS region (default: `us-east-1`) |
 | `S3_ACCESS_KEY_ID` | S3 mode | Access key ID |
@@ -946,7 +940,7 @@ Open the URL printed by Vite. API docs are at `http://localhost:<PORT>/api/docs`
 
 ### Frontend
 
-In the Replit environment the API is co-located, so no additional variables are needed. Set `VITE_API_URL` to point at a remote API server if required.
+Set `VITE_API_URL` only when the frontend needs to call a backend hosted on a different origin. In the Docker setup, API requests are proxied through Nginx.
 
 ---
 
@@ -1051,18 +1045,15 @@ pnpm --filter @workspace/api-server exec prisma migrate reset
 
 ## File Storage
 
-GradeFlow uses a pluggable storage backend selected by the `STORAGE_BACKEND` environment variable:
+GradeFlow uses S3-compatible object storage selected by the `STORAGE_BACKEND` environment variable:
 
 | Mode | When | Backend |
 |------|------|---------|
-| `replit` (default) | Running on Replit | Replit Object Storage (via GCS sidecar at 127.0.0.1:1106) |
-| `s3` | Docker / self-hosted | Any S3-compatible store — MinIO bundled, or real AWS S3 |
+| `s3` | Docker / self-hosted / production | Any S3-compatible store — MinIO bundled locally, or AWS S3-compatible storage remotely |
 
 The active backend is logged on startup:
 ```
 Storage backend: S3 (AWS-compatible)
-# or
-Storage backend: Replit Object Storage
 ```
 
 ### Upload flow
@@ -1147,8 +1138,7 @@ http://localhost:<PORT>/api/docs-json
 │   │   ├── exports/                # CSV grade export
 │   │   ├── storage/                # Object storage facade + signed upload URLs
 │   │   │   └── backends/
-│   │   │       ├── replit.backend.ts   # Replit Object Storage
-│   │   │       └── s3.backend.ts       # S3 / MinIO
+│   │   │       └── s3.backend.ts       # S3 / MinIO / AWS S3
 │   │   ├── email/                  # Resend integration (password reset)
 │   │   ├── health/                 # /api/healthz endpoint
 │   │   ├── prisma/                 # PrismaModule / PrismaService
