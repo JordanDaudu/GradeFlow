@@ -14,15 +14,9 @@ p.user.count()
 ")
 
 if [ "$USER_COUNT" = "0" ]; then
-  echo "[entrypoint] No users found — running seed..."
+  echo "[entrypoint] No users found — running secure first-boot seed..."
   node_modules/.bin/ts-node --transpile-only prisma/seed.ts
-  echo "[entrypoint] ============================================"
-  echo "[entrypoint] Default credentials created:"
-  echo "[entrypoint]   Admin    : admin@gradeflow.app    / admin123"
-  echo "[entrypoint]   Lecturer : lecturer@gradeflow.app / lecturer123"
-  echo "[entrypoint]   Grader   : grader@gradeflow.app   / grader123"
-  echo "[entrypoint] Change these passwords after first login!"
-  echo "[entrypoint] ============================================"
+  echo "[entrypoint] Initial seed complete."
 else
   echo "[entrypoint] Found $USER_COUNT user(s) — skipping seed."
 fi

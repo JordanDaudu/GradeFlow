@@ -1,11 +1,11 @@
-import { API_URL, TEST_CODE_PREFIXES, TEST_STUDENT_ID_REGEX } from './global-setup';
+import { API_URL, ADMIN_EMAIL, ADMIN_PASSWORD, TEST_CODE_PREFIXES, TEST_STUDENT_ID_REGEX } from './global-setup';
 
 async function adminToken(): Promise<string | null> {
   try {
     const res = await fetch(`${API_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@gradeflow.app', password: 'admin123' }),
+      body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
     });
     if (res.status !== 200) return null;
     const setCookie = res.headers.get('set-cookie') ?? '';

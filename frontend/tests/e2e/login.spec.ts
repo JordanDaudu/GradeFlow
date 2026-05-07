@@ -13,7 +13,7 @@ test.describe('Login flow', () => {
 
   test('shows error toast on bad credentials', async ({ page }) => {
     await page.goto('/login');
-    await page.locator('input[type="email"]').fill('admin@gradeflow.app');
+    await page.locator('input[type="email"]').fill(ADMIN.email);
     await page.locator('input[type="password"]').fill('definitely-wrong');
     await page.getByRole('button', { name: 'התחבר' }).click();
     await expect(page.getByText(/שם משתמש או סיסמה שגויים/)).toBeVisible({ timeout: 10_000 });

@@ -1,34 +1,69 @@
+import { randomBytes } from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+function readEnv(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value && value.length > 0 ? value : undefined;
+}
+
+function generateTemporaryPassword(): string {
+  return randomBytes(24).toString('base64url');
+}
+
+async function ensureInitialAdmin() {
+  const userCount = await prisma.user.count();
+
+  if (userCount > 0) {
+    console.log('Users already exist — skipping initial admin creation.');
+    return;
+  }
+
+  const isProduction = process.env.NODE_ENV === 'production';
+  const email = readEnv('SEED_ADMIN_EMAIL');
+  const configuredPassword = readEnv('SEED_ADMIN_PASSWORD');
+  const name = readEnv('SEED_ADMIN_NAME') ?? 'מנהל מערכת';
+
+  if (isProduction && (!email || !configuredPassword)) {
+    throw new Error(
+      'Production first boot requires SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD. ' +
+        'Set them as private environment variables before starting GradeFlow.',
+    );
+  }
+
+  const adminEmail = email ?? 'local-admin@gradeflow.local';
+  const adminPassword = configuredPassword ?? generateTemporaryPassword();
+
+  await prisma.user.create({
+    data: {
+      email: adminEmail,
+      passwordHash: await bcrypt.hash(adminPassword, 10),
+      name,
+      role: 'admin',
+    },
+  });
+
+  console.log(`Created initial admin user: ${adminEmail}`);
+
+  if (configuredPassword) {
+    console.log('Initial admin password loaded from SEED_ADMIN_PASSWORD.');
+  } else {
+    console.log('Generated temporary local admin password:');
+    console.log(adminPassword);
+    console.log('Save this password now, then change it after first login.');
+  }
+}
+
 async function main() {
   console.log('Seeding GradeFlow…');
 
-  const seedUsers = [
-    { email: 'admin@gradeflow.app', password: 'admin123', name: 'מנהל מערכת', role: 'admin' },
-    { email: 'lecturer@gradeflow.app', password: 'lecturer123', name: 'דר׳ רחל אבני', role: 'lecturer' },
-    { email: 'grader@gradeflow.app', password: 'grader123', name: 'אורי המתרגל', role: 'grader' },
-  ];
-  for (const u of seedUsers) {
-    const existing = await prisma.user.findUnique({ where: { email: u.email } });
-    if (!existing) {
-      await prisma.user.create({
-        data: {
-          email: u.email,
-          passwordHash: await bcrypt.hash(u.password, 10),
-          name: u.name,
-          role: u.role,
-        },
-      });
-      console.log(`Created seed user (${u.role}): ${u.email}`);
-    }
-  }
+  await ensureInitialAdmin();
 
   const courseCount = await prisma.course.count();
   if (courseCount > 0) {
-    console.log('Already seeded — skipping demo data.');
+    console.log('Already seeded — skipping sample data.');
     return;
   }
 

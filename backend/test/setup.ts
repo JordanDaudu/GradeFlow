@@ -16,8 +16,8 @@ import request from 'supertest';
 export const API_URL = process.env.TEST_API_URL || 'http://localhost:8080';
 
 export const ADMIN = {
-  email: 'admin@gradeflow.app',
-  password: 'admin123',
+  email: process.env.TEST_ADMIN_EMAIL ?? 'test-admin@gradeflow.local',
+  password: process.env.TEST_ADMIN_PASSWORD ?? 'test-admin-password-123',
 };
 
 export interface TestContext {

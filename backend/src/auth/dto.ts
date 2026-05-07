@@ -5,12 +5,12 @@ export const ALL_ROLES = ['admin', 'lecturer', 'grader'] as const;
 export type Role = (typeof ALL_ROLES)[number];
 
 export class LoginDto {
-  @ApiProperty({ example: 'admin@gradeflow.app', description: 'User email address' })
+  @ApiProperty({ example: 'user@example.com', description: 'User email address' })
   @IsString({ message: 'אימייל וסיסמה נדרשים' })
   @MinLength(1, { message: 'אימייל וסיסמה נדרשים' })
   email!: string;
 
-  @ApiProperty({ example: 'admin123', description: 'User password' })
+  @ApiProperty({ example: 'your-password', description: 'User password' })
   @IsString({ message: 'אימייל וסיסמה נדרשים' })
   @MinLength(1, { message: 'אימייל וסיסמה נדרשים' })
   password!: string;
