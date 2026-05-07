@@ -36,7 +36,7 @@ It supports Hebrew RTL out-of-the-box and provides a calm, functional environmen
 13. [Authentication & Authorization](#authentication--authorization)
 14. [Data Models](#data-models)
 15. [Testing](#testing)
-16. [Demo Accounts](#demo-accounts)
+16. [First Admin Account](#first-admin-account)
 17. [Development Workflow](#development-workflow)
 18. [Moodle Student Import](#moodle-student-import)
 19. [Backup and Restore](docs/BACKUP_AND_RESTORE.md)
@@ -60,7 +60,7 @@ It supports Hebrew RTL out-of-the-box and provides a calm, functional environmen
 - **Secure session management** — httpOnly cookie JWT with token versioning; revoke all sessions or change password from the Settings page.
 - **Admin tools** — create users, reset passwords, and issue temporary credentials from the Users page.
 - **Password reset by email** — integrates with Resend for one-time reset links; falls back gracefully when no email provider is configured.
-- **Docker deployment** — full `docker compose up` workflow with bundled MinIO object storage, automatic database migrations, and first-boot account seeding.
+- **Docker deployment** — full `docker compose up` workflow with bundled MinIO object storage, automatic database migrations, and secure first-boot admin account seeding.
 
 ---
 
@@ -319,6 +319,15 @@ S3_SECRET_ACCESS_KEY=minioadmin
 S3_PUBLIC_ENDPOINT=http://localhost:9000
 
 # ---------------------------------------------------------
+# First admin account
+# ---------------------------------------------------------
+# Required in production when the database has zero users.
+# Do not commit real values.
+SEED_ADMIN_EMAIL=
+SEED_ADMIN_PASSWORD=
+SEED_ADMIN_NAME=מנהל מערכת
+
+# ---------------------------------------------------------
 # Optional email provider
 # ---------------------------------------------------------
 RESEND_API_KEY=
@@ -349,6 +358,8 @@ JWT_SECRET=your_generated_secret_here
 ```
 
 Do not commit or publicly share `.env`.
+
+Before the first production/published-image run against an empty database, fill `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` with private real values.
 
 ---
 
@@ -488,6 +499,12 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:3000}
+
+      # First admin account.
+      # Required in production when the database has zero users.
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-מנהל מערכת}
 
       STORAGE_BACKEND: s3
       S3_BUCKET: ${S3_BUCKET:-gradeflow}
@@ -630,17 +647,19 @@ MinIO Console: http://localhost:9001
 
 ---
 
-### 11. Default seeded users
+### 11. First admin account
 
-On first startup, if the selected database has no users, the backend seeds default accounts:
+On first startup, if the selected database has no users, the backend creates one initial admin account from private environment variables:
 
-```text
-Admin:    admin@gradeflow.app    / admin123
-Lecturer: lecturer@gradeflow.app / lecturer123
-Grader:   grader@gradeflow.app   / grader123
+```env
+SEED_ADMIN_EMAIL=your_admin_email@example.com
+SEED_ADMIN_PASSWORD=your_private_strong_password
+SEED_ADMIN_NAME=מנהל מערכת
 ```
 
-Change these passwords after first login.
+Do not commit these values. For Render or any public deployment, set them in the service environment settings before starting the backend.
+
+After first login, create lecturer and grader accounts from the in-app Users page.
 
 ---
 
@@ -704,6 +723,13 @@ DIRECT_DATABASE_URL=
 LOCAL_DATABASE_URL=postgresql://gradeflow:gradeflow_password@db:5432/gradeflow
 
 FRONTEND_BASE_URL=http://localhost:3000
+
+# First admin account. For local development, you can leave these blank;
+# the seed script will generate a temporary local admin password.
+# For production/Render, set private real values.
+SEED_ADMIN_EMAIL=
+SEED_ADMIN_PASSWORD=
+SEED_ADMIN_NAME=מנהל מערכת
 
 STORAGE_BACKEND=s3
 S3_ENDPOINT=http://minio:9000
@@ -816,17 +842,19 @@ Swagger Docs:  http://localhost:3000/api/docs
 MinIO Console: http://localhost:9001
 ```
 
-### 8. Default seeded users
+### 8. First admin account
 
-On first startup, if the selected database has no users, the backend seeds default accounts:
+On first startup, if the selected database has no users, the backend creates one initial admin account from private environment variables:
 
-```text
-Admin:    admin@gradeflow.app    / admin123
-Lecturer: lecturer@gradeflow.app / lecturer123
-Grader:   grader@gradeflow.app   / grader123
+```env
+SEED_ADMIN_EMAIL=your_admin_email@example.com
+SEED_ADMIN_PASSWORD=your_private_strong_password
+SEED_ADMIN_NAME=מנהל מערכת
 ```
 
-Change these passwords after first login.
+For local development only, if these values are not provided, the seed script creates a local admin account with a generated temporary password and prints it once in the backend logs.
+
+After first login, create lecturer and grader accounts from the in-app Users page.
 
 ---
 
@@ -907,7 +935,7 @@ This makes them portable across most modern Docker environments.
 - A remote database such as Neon shares relational data between computers.
 - Local MinIO does not share uploaded files between computers. Use remote S3-compatible storage for shared uploaded files.
 - The backend automatically applies Prisma migrations on container startup.
-- The backend seeds default users only when no users exist.
+- The backend creates a secure first admin account only when no users exist.
 - The frontend is served by Nginx and proxies `/api/*` requests to the backend.
 - `.env` should never be committed to Git.
 - Full local backup/restore documentation is available in [`docs/BACKUP_AND_RESTORE.md`](docs/BACKUP_AND_RESTORE.md).
@@ -937,6 +965,9 @@ This makes them portable across most modern Docker environments.
 | `RESEND_API_KEY` | No | Resend API key for password-reset emails |
 | `RESEND_FROM_EMAIL` | No | From-address for password-reset emails |
 | `FRONTEND_BASE_URL` | No | Public URL used in email reset links |
+| `SEED_ADMIN_EMAIL` | Required for first production boot | Email for the initial admin account when the database has zero users |
+| `SEED_ADMIN_PASSWORD` | Required for first production boot | Private password for the initial admin account when the database has zero users |
+| `SEED_ADMIN_NAME` | No | Display name for the initial admin account |
 
 ### Frontend
 
@@ -1027,13 +1058,15 @@ pnpm --filter @workspace/api-server run prisma:migrate:deploy
 
 In Docker this runs automatically on every container start via `entrypoint.sh`.
 
-### Seed demo data (manual)
+### Seed sample data and first admin account (manual)
 
 ```bash
 pnpm --filter @workspace/api-server run prisma:seed
 ```
 
 In Docker, seeding happens automatically on first boot when the database is empty.
+
+The seed script creates the first admin account from `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, and `SEED_ADMIN_NAME`. In production, `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` are required if the database has zero users. In local development, if they are missing, a temporary local admin password is generated and printed once in the backend logs.
 
 ### Reset everything (development only — destructive)
 
@@ -1119,7 +1152,7 @@ http://localhost:<PORT>/api/docs-json
 ├── backend/                        # NestJS API server
 │   ├── prisma/
 │   │   ├── schema.prisma           # Database schema
-│   │   ├── seed.ts                 # Demo data seeder
+│   │   ├── seed.ts                 # First admin + sample data seeder
 │   │   └── migrations/             # Committed migration SQL files
 │   ├── src/
 │   │   ├── main.ts                 # Bootstrap + Swagger setup
@@ -1543,19 +1576,27 @@ pnpm --filter @workspace/gradeflow test:e2e
 
 ---
 
-## Demo Accounts
+## First Admin Account
 
-These accounts are seeded automatically on first Docker boot, or by running the seed script manually.
+GradeFlow does not publish demo credentials.
 
-| Email | Password | Role |
-|-------|----------|------|
-| `admin@gradeflow.app` | `admin123` | Admin |
-| `lecturer@gradeflow.app` | `lecturer123` | Lecturer |
-| `grader@gradeflow.app` | `grader123` | Grader |
+On first boot, when the database has zero users, the backend creates one initial admin account from private environment variables:
 
-**Change all passwords after first login.**
+```env
+SEED_ADMIN_EMAIL=your_admin_email@example.com
+SEED_ADMIN_PASSWORD=your_private_strong_password
+SEED_ADMIN_NAME=מנהל מערכת
+```
 
-The seed also creates:
+For production/Render, set these values in the private environment settings before starting the backend.
+
+If `NODE_ENV=production` and either `SEED_ADMIN_EMAIL` or `SEED_ADMIN_PASSWORD` is missing, the seed script fails instead of creating a public default account.
+
+For local development only, if these values are not provided, the seed script creates a local admin account with a generated temporary password and prints it once in the backend logs.
+
+After first login, create lecturer and grader accounts from the in-app Users page.
+
+The seed also creates sample development data:
 - 3 sample courses (Data Structures, Algorithms, Software Engineering)
 - 8 sample students enrolled across the courses
 - Sample assignments with due dates, weights, and max scores
