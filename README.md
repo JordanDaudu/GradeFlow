@@ -25,21 +25,22 @@ It supports Hebrew RTL out-of-the-box and provides a calm, functional environmen
 2. [Installable App (PWA)](#installable-app-pwa)
 3. [Tech Stack](#tech-stack)
 4. [Architecture Overview](#architecture-overview)
-5. [Universal Docker Run Options](#universal-docker-run-options)
-6. [Environment Variables](#environment-variables)
-7. [Database](#database)
-8. [File Storage](#file-storage)
-9. [API Documentation (Swagger)](#api-documentation-swagger)
-10. [Project Structure](#project-structure)
-11. [Frontend Routes](#frontend-routes)
-12. [API Reference](#api-reference)
-13. [Authentication & Authorization](#authentication--authorization)
-14. [Data Models](#data-models)
-15. [Testing](#testing)
-16. [First Admin Account](#first-admin-account)
-17. [Development Workflow](#development-workflow)
-18. [Moodle Student Import](#moodle-student-import)
-19. [Backup and Restore](docs/BACKUP_AND_RESTORE.md)
+5. [Cloud Deployment](#cloud-deployment)
+6. [Universal Docker Run Options](#universal-docker-run-options)
+7. [Environment Variables](#environment-variables)
+8. [Database](#database)
+9. [File Storage](#file-storage)
+10. [API Documentation (Swagger)](#api-documentation-swagger)
+11. [Project Structure](#project-structure)
+12. [Frontend Routes](#frontend-routes)
+13. [API Reference](#api-reference)
+14. [Authentication & Authorization](#authentication--authorization)
+15. [Data Models](#data-models)
+16. [Testing](#testing)
+17. [First Admin Account](#first-admin-account)
+18. [Development Workflow](#development-workflow)
+19. [Moodle Student Import](#moodle-student-import)
+20. [Backup and Restore](docs/BACKUP_AND_RESTORE.md)
 
 ---
 
@@ -60,7 +61,7 @@ It supports Hebrew RTL out-of-the-box and provides a calm, functional environmen
 - **Secure session management** — httpOnly cookie JWT with token versioning; revoke all sessions or change password from the Settings page.
 - **Admin tools** — create users, reset passwords, and issue temporary credentials from the Users page.
 - **Password reset by email** — integrates with Resend for one-time reset links; falls back gracefully when no email provider is configured.
-- **Docker deployment** — full `docker compose up` workflow with bundled MinIO object storage, automatic database migrations, and secure first-boot admin account seeding.
+- **Docker deployment** — full `docker compose up` workflow with bundled MinIO object storage, automatic database migrations, and first-boot account seeding.
 
 ---
 
@@ -193,6 +194,154 @@ The production setup separates the hosted frontend, hosted backend, managed Post
 
 ---
 
+## Cloud Deployment
+
+GradeFlow can run as a full cloud deployment using managed services:
+
+```text
+Frontend:     Render Static Site
+Backend:      Render Web Service
+Database:     Neon PostgreSQL
+File storage: AWS S3
+```
+
+This deployment keeps the frontend and backend as separate services while using the frontend domain as the public entry point for both the app and `/api/*` requests.
+
+### Backend — Render Web Service
+
+Recommended backend settings:
+
+```text
+Runtime: Docker
+Dockerfile path: docker/backend/Dockerfile
+Health check path: /api/healthz
+```
+
+Required backend environment variables:
+
+```env
+PORT=8080
+NODE_ENV=production
+
+DATABASE_URL=postgresql://USER:PASSWORD@HOST-pooler.REGION.neon.tech/neondb?sslmode=require&channel_binding=require
+DIRECT_DATABASE_URL=postgresql://USER:PASSWORD@HOST.REGION.neon.tech/neondb?sslmode=require&channel_binding=require
+
+JWT_SECRET=replace_with_a_long_random_secret
+
+FRONTEND_BASE_URL=https://your-frontend.onrender.com
+
+SEED_ADMIN_EMAIL=your_admin_email@example.com
+SEED_ADMIN_PASSWORD=your_private_strong_password
+SEED_ADMIN_NAME=מנהל מערכת
+
+STORAGE_BACKEND=s3
+S3_BUCKET=your-s3-bucket-name
+S3_REGION=eu-central-1
+S3_ACCESS_KEY_ID=your_aws_access_key_id
+S3_SECRET_ACCESS_KEY=your_aws_secret_access_key
+S3_FORCE_PATH_STYLE=false
+```
+
+For AWS S3, do not set `S3_ENDPOINT` or `S3_PUBLIC_ENDPOINT`. Those variables are mainly for local MinIO or custom S3-compatible providers.
+
+### Frontend — Render Static Site
+
+Recommended frontend settings:
+
+```text
+Build command:
+corepack enable && pnpm install --frozen-lockfile && pnpm --filter @workspace/gradeflow run build
+
+Publish directory:
+frontend/dist/public
+```
+
+Recommended frontend environment variables:
+
+```env
+NODE_VERSION=22.22.0
+```
+
+Do not set `VITE_API_URL` when using Render rewrites. The frontend should call relative `/api/*` routes.
+
+### Frontend rewrites
+
+Add these Render rewrite rules to the frontend Static Site in this exact order:
+
+```text
+Source: /api/*
+Destination: https://your-backend.onrender.com/api/*
+Action: Rewrite
+```
+
+```text
+Source: /*
+Destination: /index.html
+Action: Rewrite
+```
+
+The `/api/*` rule must appear before the SPA fallback rule, otherwise API requests may be handled as frontend routes.
+
+### AWS S3 bucket CORS
+
+For browser uploads through presigned URLs, configure the S3 bucket CORS:
+
+```json
+[
+  {
+    "AllowedOrigins": [
+      "https://your-frontend.onrender.com"
+    ],
+    "AllowedMethods": [
+      "PUT",
+      "GET",
+      "HEAD"
+    ],
+    "AllowedHeaders": [
+      "*"
+    ],
+    "ExposeHeaders": [
+      "ETag"
+    ],
+    "MaxAgeSeconds": 3000
+  }
+]
+```
+
+When using a custom domain, add that domain to `AllowedOrigins` as well.
+
+### Cloud verification checklist
+
+Before considering the cloud deployment complete, verify:
+
+- Backend health works directly:
+
+```text
+https://your-backend.onrender.com/api/healthz
+```
+
+- Backend health works through the frontend rewrite:
+
+```text
+https://your-frontend.onrender.com/api/healthz
+```
+
+Expected response:
+
+```json
+{ "status": "ok" }
+```
+
+Then verify in the UI:
+
+- Login works with the private admin account.
+- Creating/editing data appears in Neon.
+- PDF upload works.
+- PDF preview/download works.
+- Deleting a submission file removes the object from S3.
+
+---
+
 ## Universal Docker Run Options
 
 GradeFlow can be run on any machine that has Docker installed, including macOS, Windows, and Linux.
@@ -321,10 +470,11 @@ S3_PUBLIC_ENDPOINT=http://localhost:9000
 # ---------------------------------------------------------
 # First admin account
 # ---------------------------------------------------------
-# Required in production when the database has zero users.
+# Required on first Docker boot when the selected database has zero users,
+# because the Docker backend runs with NODE_ENV=production.
 # Do not commit real values.
-SEED_ADMIN_EMAIL=
-SEED_ADMIN_PASSWORD=
+SEED_ADMIN_EMAIL=your_admin_email@example.com
+SEED_ADMIN_PASSWORD=your_private_strong_password
 SEED_ADMIN_NAME=מנהל מערכת
 
 # ---------------------------------------------------------
@@ -359,7 +509,7 @@ JWT_SECRET=your_generated_secret_here
 
 Do not commit or publicly share `.env`.
 
-Before the first production/published-image run against an empty database, fill `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` with private real values.
+Before the first published-image run against an empty database, replace `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` with private real values.
 
 ---
 
@@ -499,12 +649,6 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:3000}
-
-      # First admin account.
-      # Required in production when the database has zero users.
-      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
-      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
-      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-מנהל מערכת}
 
       STORAGE_BACKEND: s3
       S3_BUCKET: ${S3_BUCKET:-gradeflow}
@@ -657,7 +801,7 @@ SEED_ADMIN_PASSWORD=your_private_strong_password
 SEED_ADMIN_NAME=מנהל מערכת
 ```
 
-Do not commit these values. For Render or any public deployment, set them in the service environment settings before starting the backend.
+Do not commit these values. For Docker, Render, or any public deployment, set them before starting the backend against an empty database.
 
 After first login, create lecturer and grader accounts from the in-app Users page.
 
@@ -724,11 +868,12 @@ LOCAL_DATABASE_URL=postgresql://gradeflow:gradeflow_password@db:5432/gradeflow
 
 FRONTEND_BASE_URL=http://localhost:3000
 
-# First admin account. For local development, you can leave these blank;
-# the seed script will generate a temporary local admin password.
-# For production/Render, set private real values.
-SEED_ADMIN_EMAIL=
-SEED_ADMIN_PASSWORD=
+# First admin account.
+# Required on first Docker boot when the selected database has zero users,
+# because the Docker backend runs with NODE_ENV=production.
+# Do not commit real values.
+SEED_ADMIN_EMAIL=your_admin_email@example.com
+SEED_ADMIN_PASSWORD=your_private_strong_password
 SEED_ADMIN_NAME=מנהל מערכת
 
 STORAGE_BACKEND=s3
@@ -852,7 +997,7 @@ SEED_ADMIN_PASSWORD=your_private_strong_password
 SEED_ADMIN_NAME=מנהל מערכת
 ```
 
-For local development only, if these values are not provided, the seed script creates a local admin account with a generated temporary password and prints it once in the backend logs.
+When running Docker, the backend runs in production mode. Set `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` before first boot when the selected database has zero users.
 
 After first login, create lecturer and grader accounts from the in-app Users page.
 
@@ -933,9 +1078,10 @@ This makes them portable across most modern Docker environments.
 - PostgreSQL stores GradeFlow relational data.
 - MinIO provides local S3-compatible object storage for uploaded assignment/submission files.
 - A remote database such as Neon shares relational data between computers.
+- AWS S3 or another remote S3-compatible storage provider shares uploaded files between cloud services or multiple computers.
 - Local MinIO does not share uploaded files between computers. Use remote S3-compatible storage for shared uploaded files.
 - The backend automatically applies Prisma migrations on container startup.
-- The backend creates a secure first admin account only when no users exist.
+- The backend seeds default users only when no users exist.
 - The frontend is served by Nginx and proxies `/api/*` requests to the backend.
 - `.env` should never be committed to Git.
 - Full local backup/restore documentation is available in [`docs/BACKUP_AND_RESTORE.md`](docs/BACKUP_AND_RESTORE.md).
@@ -965,13 +1111,10 @@ This makes them portable across most modern Docker environments.
 | `RESEND_API_KEY` | No | Resend API key for password-reset emails |
 | `RESEND_FROM_EMAIL` | No | From-address for password-reset emails |
 | `FRONTEND_BASE_URL` | No | Public URL used in email reset links |
-| `SEED_ADMIN_EMAIL` | Required for first production boot | Email for the initial admin account when the database has zero users |
-| `SEED_ADMIN_PASSWORD` | Required for first production boot | Private password for the initial admin account when the database has zero users |
-| `SEED_ADMIN_NAME` | No | Display name for the initial admin account |
 
 ### Frontend
 
-Set `VITE_API_URL` only when the frontend needs to call a backend hosted on a different origin. In the Docker setup, API requests are proxied through Nginx.
+Set `VITE_API_URL` only when the frontend needs to call a backend hosted on a different origin without a rewrite/proxy. In the Docker setup, API requests are proxied through Nginx. In the Render setup, API requests are proxied through the frontend Static Site rewrite rule for `/api/*`.
 
 ---
 
@@ -1066,7 +1209,7 @@ pnpm --filter @workspace/api-server run prisma:seed
 
 In Docker, seeding happens automatically on first boot when the database is empty.
 
-The seed script creates the first admin account from `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, and `SEED_ADMIN_NAME`. In production, `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` are required if the database has zero users. In local development, if they are missing, a temporary local admin password is generated and printed once in the backend logs.
+The seed script creates the first admin account from `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, and `SEED_ADMIN_NAME`. In production, `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` are required if the database has zero users. Outside production mode, if they are missing, a temporary local admin password can be generated and printed once in the backend logs.
 
 ### Reset everything (development only — destructive)
 
@@ -1116,8 +1259,10 @@ Client                              Backend                      Object Storage
 
 Uses `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner`. Notable behaviour:
 
-- Generates presigned PUT URLs pointing at `S3_PUBLIC_ENDPOINT` (browser-facing)
-- Uses `S3_ENDPOINT` for all server-side API calls (GetObject, HeadObject, DeleteObject)
+- Generates presigned PUT URLs for direct browser uploads
+- For local MinIO/custom S3-compatible providers, `S3_PUBLIC_ENDPOINT` is used for browser-facing upload URLs
+- For local MinIO/custom S3-compatible providers, `S3_ENDPOINT` is used for server-side API calls
+- For AWS S3, `S3_ENDPOINT` and `S3_PUBLIC_ENDPOINT` should usually be unset; the AWS SDK uses the standard regional S3 endpoint from `S3_REGION`
 - Automatically creates the S3 bucket on module init if it does not exist
 - Handles region-specific bucket creation (`CreateBucketConfiguration`) for AWS regions other than `us-east-1`
 
@@ -1152,7 +1297,7 @@ http://localhost:<PORT>/api/docs-json
 ├── backend/                        # NestJS API server
 │   ├── prisma/
 │   │   ├── schema.prisma           # Database schema
-│   │   ├── seed.ts                 # First admin + sample data seeder
+│   │   ├── seed.ts                 # Demo data seeder
 │   │   └── migrations/             # Committed migration SQL files
 │   ├── src/
 │   │   ├── main.ts                 # Bootstrap + Swagger setup
@@ -1588,11 +1733,11 @@ SEED_ADMIN_PASSWORD=your_private_strong_password
 SEED_ADMIN_NAME=מנהל מערכת
 ```
 
-For production/Render, set these values in the private environment settings before starting the backend.
+For Docker, Render, or any public deployment, set these values in private environment variables before starting the backend against an empty database.
 
 If `NODE_ENV=production` and either `SEED_ADMIN_EMAIL` or `SEED_ADMIN_PASSWORD` is missing, the seed script fails instead of creating a public default account.
 
-For local development only, if these values are not provided, the seed script creates a local admin account with a generated temporary password and prints it once in the backend logs.
+When running the seed script outside production mode, if these values are not provided, the seed script can create a local admin account with a generated temporary password and print it once in the backend logs. In Docker and Render production mode, set `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` before first boot when the database has zero users.
 
 After first login, create lecturer and grader accounts from the in-app Users page.
 
