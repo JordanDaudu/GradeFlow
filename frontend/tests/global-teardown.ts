@@ -1,4 +1,4 @@
-import { API_URL, TEST_CODE_PREFIXES, TEST_STUDENT_ID_REGEX } from './global-setup';
+import { API_URL, ADMIN_EMAIL, ADMIN_PASSWORD, TEST_CODE_PREFIXES, TEST_STUDENT_ID_REGEX } from './global-setup';
 
 async function adminToken(): Promise<string | null> {
   try {

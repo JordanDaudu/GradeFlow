@@ -46,10 +46,8 @@ async function bootstrap() {
         '**Authentication:** Call `POST /api/auth/login` first. The server issues an ' +
         'httpOnly cookie (`gradeflow_token`) that is automatically sent on subsequent ' +
         'requests from a browser or any cookie-aware HTTP client.\n\n' +
-        '**Default credentials (development):**\n' +
-        '- Admin: `admin@gradeflow.app` / `admin123`\n' +
-        '- Lecturer: `lecturer@gradeflow.app` / `lecturer123`\n' +
-        '- Grader: `grader@gradeflow.app` / `grader123`\n\n' +
+        '**First admin account:** Create it through the secure first-boot seed ' +
+        'environment variables, then use the Users admin screen to add lecturers and graders.\n\n' +
         '**Error envelope:** All errors are returned as `{ "error": "<message>" }`.',
     )
     .setVersion('1.0')

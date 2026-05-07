@@ -99,7 +99,7 @@ export default function LoginPage() {
                       <FormItem>
                         <FormLabel>אימייל</FormLabel>
                         <FormControl>
-                          <Input placeholder="admin@gradeflow.app" type="email" {...field} dir="ltr" className="text-right" />
+                          <Input placeholder="you@example.com" type="email" {...field} dir="ltr" className="text-right" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -145,8 +145,8 @@ export default function LoginPage() {
               </Form>
               
               <div className="mt-6 text-center text-sm text-muted-foreground border-t border-border pt-4">
-                <p>פרטי גישה להדגמה:</p>
-                <p className="font-mono mt-1 select-all" dir="ltr">admin@gradeflow.app / admin123</p>
+                <p>אין לך חשבון?</p>
+                <p className="mt-1">פנה למנהל המערכת לקבלת פרטי גישה.</p>
               </div>
             </CardContent>
           </Card>

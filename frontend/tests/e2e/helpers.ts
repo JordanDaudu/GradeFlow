@@ -1,8 +1,8 @@
 import { type APIRequestContext, type Page, expect } from '@playwright/test';
 
 export const ADMIN = {
-  email: 'admin@gradeflow.app',
-  password: 'admin123',
+  email: process.env.E2E_ADMIN_EMAIL ?? 'test-admin@gradeflow.local',
+  password: process.env.E2E_ADMIN_PASSWORD ?? 'test-admin-password-123',
 };
 
 export function unique(prefix: string): string {

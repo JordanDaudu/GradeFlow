@@ -2,8 +2,8 @@ import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { resolve } from 'node:path';
 
-export const ADMIN_EMAIL = 'admin@gradeflow.app';
-export const ADMIN_PASSWORD = 'admin123';
+export const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'test-admin@gradeflow.local';
+export const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'test-admin-password-123';
 export const API_URL = process.env.E2E_API_URL || 'http://localhost:8080';
 
 export const TEST_CODE_PREFIXES = ['GRD-', 'RUB-', 'E2E-', 'TST-'];
@@ -40,7 +40,12 @@ function runSeed(): Promise<number> {
   return new Promise((resolveProc) => {
     const child = spawn('pnpm', ['--filter', '@workspace/api-server', 'run', 'seed'], {
       cwd: workspaceRoot,
-      env: process.env,
+      env: {
+        ...process.env,
+        SEED_ADMIN_EMAIL: process.env.SEED_ADMIN_EMAIL ?? ADMIN_EMAIL,
+        SEED_ADMIN_PASSWORD: process.env.SEED_ADMIN_PASSWORD ?? ADMIN_PASSWORD,
+        SEED_ADMIN_NAME: process.env.SEED_ADMIN_NAME ?? 'E2E Admin',
+      },
       stdio: 'inherit',
     });
     child.on('close', (code) => resolveProc(code ?? 1));
