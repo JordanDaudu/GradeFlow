@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ObjectStorageService } from '../storage/object-storage.service';
 
 export const ALLOWED_STATUSES = new Set([
   'pending',
@@ -12,7 +13,12 @@ export const ALLOWED_STATUSES = new Set([
 
 @Injectable()
 export class SubmissionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(SubmissionsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: ObjectStorageService,
+  ) {}
 
   async getDetail(id: number) {
     const s = await this.prisma.submission.findUnique({
@@ -135,21 +141,43 @@ export class SubmissionsService {
     return d;
   }
 
-  async removeFile(id: number) {
-    await this.prisma.submission.update({
-      where: { id },
-      data: {
-        fileObjectPath: null,
-        fileName: null,
-        contentType: null,
-        fileSize: null,
-        updatedAt: new Date(),
-      },
-    });
-    const d = await this.getDetail(id);
-    if (!d) throw new NotFoundException({ error: 'לא נמצא' });
-    return d;
+async removeFile(id: number) {
+  const existing = await this.prisma.submission.findUnique({
+    where: { id },
+    select: { fileObjectPath: true },
+  });
+
+  if (!existing) {
+    throw new NotFoundException({ error: 'לא נמצא' });
   }
+
+  await this.prisma.submission.update({
+    where: { id },
+    data: {
+      fileObjectPath: null,
+      fileName: null,
+      contentType: null,
+      fileSize: null,
+      updatedAt: new Date(),
+    },
+  });
+
+  if (existing.fileObjectPath) {
+    try {
+      await this.storage.deleteObject(existing.fileObjectPath);
+    } catch (err) {
+      this.logger.warn(
+        `Failed to delete object ${existing.fileObjectPath} for submission ${id}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+
+  const d = await this.getDetail(id);
+  if (!d) throw new NotFoundException({ error: 'לא נמצא' });
+  return d;
+}
 
   async attachFile(
     id: number,
